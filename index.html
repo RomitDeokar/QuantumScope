@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>QUANTUMSCOPE // QS-01 — Interactive Quantum State Evolution Lab</title>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -291,7 +290,7 @@ body::after{
 
 /* ===== BLOCH SPHERE ===== */
 #bloch-mount{
-  width:100%;flex:1;min-height:200px;
+  width:100%;flex:1;min-height:220px;
   background:radial-gradient(circle at center,var(--bg3),var(--bg));
   border:1px solid var(--border2);
   position:relative;overflow:hidden;
@@ -301,7 +300,6 @@ body::after{
   font-size:8px;color:var(--text3);letter-spacing:2px;font-family:var(--font-main);
   z-index:5;
 }
-#bloch-canvas{width:100%;height:100%;display:block;}
 
 /* Bloch info overlays */
 .bloch-info{
@@ -452,8 +450,8 @@ body::after{
   text-align:center;font-family:var(--font-main);padding:4px 0;
 }
 .bell-sphere-mini{
-  height:120px;border:1px solid var(--border2);
-  background:var(--bg3);position:relative;
+  height:140px;border:1px solid var(--border2);
+  background:var(--bg3);position:relative;overflow:hidden;
 }
 .bell-correlation{
   text-align:center;padding:6px;font-size:9px;
@@ -703,7 +701,6 @@ body::after{
 
         <!-- Bloch 3D -->
         <div id="bloch-mount">
-          <canvas id="bloch-canvas"></canvas>
           <div class="bloch-info">
             <div class="bloch-stat">θ: <span id="bloch-theta">0.0°</span></div>
             <div class="bloch-stat">φ: <span id="bloch-phi">0.0°</span></div>
@@ -869,13 +866,26 @@ body::after{
   </div>
 </div>
 
-<script>
+<!-- THREE.JS via importmap for modern module loading -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
 // ═══════════════════════════════════════════════════════════════
 //  QUANTUMSCOPE QS-01 — COMPLETE QUANTUM STATE EVOLUTION ENGINE
 //  Problem 16: Quantum Visual Simulator | QtHack04
 //  Scientifically accurate single-qubit + Bell state simulation
 //  Architecture: Single source of truth → all UI consumes state
 // ═══════════════════════════════════════════════════════════════
+
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 // ═════════ COMPLEX NUMBER ENGINE ═════════
 class Complex {
@@ -1003,7 +1013,7 @@ const QState = {
   alpha: new Complex(1, 0),
   beta: new Complex(0, 0),
   gateHistory: [],
-  gateDefHistory: [],  // Store gate defs for undo replay
+  gateDefHistory: [],
   measured: false,
   collapsedTo: null,
   bellMode: false,
@@ -1011,44 +1021,27 @@ const QState = {
   measureCount: 0,
   histogram: { 0: 0, 1: 0 },
 
-  // Derived quantities — computed from alpha and beta
   get p0() { return this.alpha.abs2(); },
   get p1() { return this.beta.abs2(); },
   get theta() { return 2 * Math.acos(Math.min(1, Math.max(0, Math.sqrt(this.p0)))); },
   get phi() {
-    // Phase of β relative to α
     return Math.atan2(this.beta.im, this.beta.re) - Math.atan2(this.alpha.im, this.alpha.re);
   },
-  // Bloch vector components: exact formula
-  get blochX() {
-    // x = 2·Re(α*·β)
-    const c = this.alpha.conj().mul(this.beta);
-    return 2 * c.re;
-  },
-  get blochY() {
-    // y = 2·Im(α*·β)
-    const c = this.alpha.conj().mul(this.beta);
-    return 2 * c.im;
-  },
-  get blochZ() {
-    // z = |α|² - |β|²
-    return this.p0 - this.p1;
-  },
+  // Bloch vector: exact formulas
+  get blochX() { const c = this.alpha.conj().mul(this.beta); return 2 * c.re; },
+  get blochY() { const c = this.alpha.conj().mul(this.beta); return 2 * c.im; },
+  get blochZ() { return this.p0 - this.p1; },
   get entropy() {
     const p = this.p0;
     if (p < 1e-10 || p > 1 - 1e-10) return 0;
     return -(p * Math.log2(p) + (1-p) * Math.log2(1-p));
   },
   get norm() { return Math.sqrt(this.p0 + this.p1); },
-  get fidelity() {
-    // Fidelity with initial state |0⟩
-    return this.p0;
-  },
+  get fidelity() { return this.p0; },
 
   applyMatrix(gate) {
     const m = gate.matrix;
     const a = this.alpha.clone(), b = this.beta.clone();
-    // Matrix multiplication: |ψ'⟩ = U|ψ⟩
     this.alpha = m[0][0].mul(a).add(m[0][1].mul(b));
     this.beta  = m[1][0].mul(a).add(m[1][1].mul(b));
     this.normalize();
@@ -1074,23 +1067,20 @@ const QState = {
   }
 };
 
-// ═════════ UI UPDATE ENGINE — All panels consume state ═════════
+// ═════════ UI UPDATE ENGINE ═════════
 let lastGateDef = null;
 
 function updateAllUI() {
-  // State equation display
   const eq = document.getElementById('eq-main');
   const aStr = QState.alpha.toString(3);
   const bStr = QState.beta.toString(3);
   eq.textContent = `|ψ⟩ = (${aStr})·|0⟩ + (${bStr})·|1⟩`;
 
-  // Full complex amplitudes
   document.getElementById('amp-alpha').innerHTML =
     `<span class="re">${QState.alpha.re.toFixed(3)}</span> + <span class="im">${QState.alpha.im.toFixed(3)}</span>i`;
   document.getElementById('amp-beta').innerHTML =
     `<span class="re">${QState.beta.re.toFixed(3)}</span> + <span class="im">${QState.beta.im.toFixed(3)}</span>i`;
 
-  // Probabilities
   const p0 = QState.p0 * 100, p1 = QState.p1 * 100;
   document.getElementById('val-p0').textContent = p0.toFixed(1) + '%';
   document.getElementById('val-p1').textContent = p1.toFixed(1) + '%';
@@ -1099,7 +1089,6 @@ function updateAllUI() {
   document.getElementById('pct0').textContent = p0.toFixed(1) + '%';
   document.getElementById('pct1').textContent = p1.toFixed(1) + '%';
 
-  // Bloch angles
   const thetaDeg = (QState.theta * 180 / Math.PI).toFixed(1);
   const phiDeg = (QState.phi * 180 / Math.PI).toFixed(1);
   document.getElementById('val-theta').textContent = thetaDeg + '°';
@@ -1107,58 +1096,44 @@ function updateAllUI() {
   document.getElementById('bloch-theta').textContent = thetaDeg + '°';
   document.getElementById('bloch-phi').textContent = phiDeg + '°';
 
-  // Bloch vector components
   document.getElementById('bloch-x').textContent = QState.blochX.toFixed(2);
   document.getElementById('bloch-y').textContent = QState.blochY.toFixed(2);
   document.getElementById('bloch-z').textContent = QState.blochZ.toFixed(2);
 
-  // State label
   let stateLabel = '', stateBadge = '';
   if (QState.measured) {
     stateLabel = 'COLLAPSED → |' + QState.collapsedTo + '⟩';
     stateBadge = 'COLLAPSED |' + QState.collapsedTo + '⟩';
   } else if (p0 > 99.9) {
-    stateLabel = 'GROUND STATE';
-    stateBadge = '|0⟩ GROUND';
+    stateLabel = 'GROUND STATE'; stateBadge = '|0⟩ GROUND';
   } else if (p1 > 99.9) {
-    stateLabel = 'EXCITED STATE';
-    stateBadge = '|1⟩ EXCITED';
+    stateLabel = 'EXCITED STATE'; stateBadge = '|1⟩ EXCITED';
   } else if (Math.abs(p0 - 50) < 0.5) {
-    stateLabel = 'EQUAL SUPERPOSITION';
-    stateBadge = '|+⟩ SUPER';
+    stateLabel = 'EQUAL SUPERPOSITION'; stateBadge = '|+⟩ SUPER';
   } else {
-    stateLabel = 'SUPERPOSITION STATE';
-    stateBadge = '|ψ⟩ SUPER';
+    stateLabel = 'SUPERPOSITION STATE'; stateBadge = '|ψ⟩ SUPER';
   }
   document.getElementById('eq-sub').textContent = stateLabel;
   document.getElementById('state-badge').textContent = stateBadge;
 
-  // Bloch state mini label
   const bState = document.getElementById('bloch-state');
   if (p0 > 99.9) bState.textContent = '|0⟩';
   else if (p1 > 99.9) bState.textContent = '|1⟩';
   else bState.textContent = '|ψ⟩';
 
-  // Normalization bar
   const normFill = document.getElementById('norm-fill');
   const normVal = QState.norm;
   normFill.style.width = (normVal * 100).toFixed(1) + '%';
   normFill.className = 'norm-fill' + (normVal > 0.999 ? '' : normVal > 0.95 ? ' warn' : ' err');
 
-  // Stats
   document.getElementById('stat-gates').textContent = QState.gatesApplied;
   document.getElementById('stat-measures').textContent = QState.measureCount;
   document.getElementById('stat-entropy').textContent = QState.entropy.toFixed(3);
   document.getElementById('stat-fidelity').textContent = QState.fidelity.toFixed(3);
   document.getElementById('gate-count').textContent = QState.gateHistory.length + ' GATES';
 
-  // Prognosis
   updatePrognosis();
-
-  // Histogram
   updateHistogram();
-
-  // Animate Bloch sphere target
   animateBlochTarget();
 }
 
@@ -1169,20 +1144,14 @@ function updatePrognosis() {
   const badge = document.getElementById('prognosis-badge');
 
   if (QState.measured) {
-    val.textContent = '100%';
-    val.style.color = 'var(--green)';
-    trend.textContent = 'COLLAPSED — deterministic state';
-    badge.textContent = 'COLLAPSED';
+    val.textContent = '100%'; val.style.color = 'var(--green)';
+    trend.textContent = 'COLLAPSED — deterministic state'; badge.textContent = 'COLLAPSED';
   } else if (p0 > 0.99 || p0 < 0.01) {
-    val.textContent = '100%';
-    val.style.color = 'var(--green)';
-    trend.textContent = 'DETERMINISTIC — certain outcome';
-    badge.textContent = 'CERTAIN';
+    val.textContent = '100%'; val.style.color = 'var(--green)';
+    trend.textContent = 'DETERMINISTIC — certain outcome'; badge.textContent = 'CERTAIN';
   } else if (Math.abs(p0 - 0.5) < 0.01) {
-    val.textContent = '50.0%';
-    val.style.color = 'var(--amber)';
-    trend.textContent = 'MAXIMUM UNCERTAINTY — equal superposition';
-    badge.textContent = 'UNCERTAIN';
+    val.textContent = '50.0%'; val.style.color = 'var(--amber)';
+    trend.textContent = 'MAXIMUM UNCERTAINTY — equal superposition'; badge.textContent = 'UNCERTAIN';
   } else {
     const conf = Math.max(p0, 1-p0) * 100;
     val.textContent = conf.toFixed(1) + '%';
@@ -1194,10 +1163,7 @@ function updatePrognosis() {
 
 function updateHistogram() {
   const total = QState.histogram[0] + QState.histogram[1];
-  if (total === 0) {
-    document.getElementById('histogram-section').style.display = 'none';
-    return;
-  }
+  if (total === 0) { document.getElementById('histogram-section').style.display = 'none'; return; }
   document.getElementById('histogram-section').style.display = 'block';
   document.getElementById('hist-total').textContent = total;
   const maxCount = Math.max(QState.histogram[0], QState.histogram[1], 1);
@@ -1216,29 +1182,21 @@ function updateGatePhysics(gateDef) {
   document.getElementById('gate-basis').textContent = gateDef.basis;
   document.getElementById('gate-bloch-transform').textContent = gateDef.bloch;
 
-  // Matrix visual
   const vis = document.getElementById('gate-matrix-vis');
   vis.innerHTML = '';
   const cells = gateDef.matVis || ['1','0','0','1'];
-  // Handle 4x4 matrix (CNOT) by using 2x2 display
-  const displayCells = cells.length > 4 ? cells.slice(0,4) : cells;
   if (cells.length > 4) {
     vis.style.gridTemplateColumns = 'repeat(4, 1fr)';
     cells.forEach(v => {
       const cell = document.createElement('div');
-      cell.className = 'mat-cell';
-      cell.style.fontSize = '8px';
-      cell.style.padding = '2px';
-      cell.textContent = v;
-      vis.appendChild(cell);
+      cell.className = 'mat-cell'; cell.style.fontSize = '8px'; cell.style.padding = '2px';
+      cell.textContent = v; vis.appendChild(cell);
     });
   } else {
     vis.style.gridTemplateColumns = '1fr 1fr';
-    displayCells.forEach(v => {
+    cells.forEach(v => {
       const cell = document.createElement('div');
-      cell.className = 'mat-cell';
-      cell.textContent = v;
-      vis.appendChild(cell);
+      cell.className = 'mat-cell'; cell.textContent = v; vis.appendChild(cell);
     });
   }
 }
@@ -1248,20 +1206,18 @@ function updateCircuit() {
   wire.innerHTML = '<span class="wire-init">|0⟩ —</span>';
   QState.gateHistory.forEach(g => {
     const chip = document.createElement('span');
-    // Extract base gate name for chip class
     const baseName = g.startsWith('Rx') ? 'Rx' : g.startsWith('Ry') ? 'Ry' : g;
     chip.className = 'gate-chip ' + baseName + '-chip';
     chip.textContent = g;
     wire.appendChild(chip);
   });
   const end = document.createElement('span');
-  end.className = 'wire-end';
-  end.textContent = '— |ψ⟩';
+  end.className = 'wire-end'; end.textContent = '— |ψ⟩';
   wire.appendChild(end);
 }
 
 // ═════════ GATE APPLICATION ═════════
-function applyGate(gateName) {
+window.applyGate = function(gateName) {
   if (QState.measured) { resetState(); }
   QState.bellMode = false;
   document.getElementById('bell-info').style.display = 'none';
@@ -1283,20 +1239,19 @@ function applyGate(gateName) {
   addLog('GATE_APPLIED: ' + gateName, 'warn');
   addLog(`α=${QState.alpha.toString(3)}  β=${QState.beta.toString(3)}`, 'info');
   addLog(`θ=${(QState.theta*180/Math.PI).toFixed(1)}° φ=${(QState.phi*180/Math.PI).toFixed(1)}°`, 'info');
-
   flashOverlay('cyan');
-}
+};
 
 let pendingAngleGate = 'Rx';
-function showAngleInput(type) {
+window.showAngleInput = function(type) {
   pendingAngleGate = type;
   const wrap = document.getElementById('angle-wrap');
   wrap.classList.add('show');
   document.getElementById('angle-label').textContent = type + '(θ):';
   document.getElementById('angle-val').focus();
-}
+};
 
-function applyAngleGate() {
+window.applyAngleGate = function() {
   const deg = parseFloat(document.getElementById('angle-val').value) || 90;
   const gate = pendingAngleGate === 'Rx' ? makeRx(deg) : makeRy(deg);
   document.getElementById('angle-wrap').classList.remove('show');
@@ -1318,10 +1273,10 @@ function applyAngleGate() {
   addLog('GATE_APPLIED: ' + gate.label, 'warn');
   addLog(`α=${QState.alpha.toString(3)}  β=${QState.beta.toString(3)}`, 'info');
   flashOverlay('cyan');
-}
+};
 
 // ═════════ MEASUREMENT — Probabilistic collapse ═════════
-function measure() {
+window.measure = function() {
   if (QState.measured) return;
 
   const p0 = QState.p0;
@@ -1330,10 +1285,8 @@ function measure() {
 
   addLog(`MEASUREMENT_INITIATED — rand=${rand.toFixed(4)} threshold=${p0.toFixed(4)}`, 'sys');
 
-  // Flash & vibrate (theatrical effect)
   flashOverlay('red');
   vibrateBloch(() => {
-    // Probabilistic collapse
     QState.alpha = result === 0 ? new Complex(1, 0) : new Complex(0, 0);
     QState.beta  = result === 0 ? new Complex(0, 0) : new Complex(1, 0);
     QState.measured = true;
@@ -1345,34 +1298,24 @@ function measure() {
     addLog('WAVEFUNCTION_COLLAPSED → |' + result + '⟩', 'err');
     addLog('PROBABILITY_VERIFIED: P(|' + result + '⟩) was ' + (result === 0 ? p0 : 1-p0).toFixed(4), 'info');
 
-    // Challenge verification
-    if (challengeActive && currentChallenge) {
-      revealChallenge(result);
-    }
+    if (challengeActive && currentChallenge) { revealChallenge(result); }
   });
-}
+};
 
-// Multi-measurement: simulate 100 measurements without resetting visual
-function multiMeasure() {
-  if (QState.measured) {
-    addLog('MULTI_MEASURE: Reset state first', 'warn');
-    return;
-  }
+window.multiMeasure = function() {
+  if (QState.measured) { addLog('MULTI_MEASURE: Reset state first', 'warn'); return; }
   const p0 = QState.p0;
   const savedAlpha = QState.alpha.clone();
   const savedBeta = QState.beta.clone();
   let count0 = 0, count1 = 0;
 
   for (let i = 0; i < 100; i++) {
-    const result = Math.random() < p0 ? 0 : 1;
-    if (result === 0) count0++; else count1++;
+    if (Math.random() < p0) count0++; else count1++;
   }
 
   QState.histogram[0] += count0;
   QState.histogram[1] += count1;
   QState.measureCount += 100;
-
-  // Restore state (multi-measure is non-destructive)
   QState.alpha = savedAlpha;
   QState.beta = savedBeta;
 
@@ -1380,21 +1323,19 @@ function multiMeasure() {
   addLog(`MULTI_MEASURE(100): |0⟩=${count0} |1⟩=${count1}`, 'ok');
   addLog(`EXPECTED: P(0)=${(p0*100).toFixed(1)}% ACTUAL: ${count0}%`, 'info');
   flashOverlay('cyan');
-}
+};
 
 function flashOverlay(color) {
   const o = document.getElementById('collapse-overlay');
-  if (color === 'red') {
-    o.style.background = 'radial-gradient(circle at center,rgba(255,23,68,0.1),rgba(255,23,68,0.02))';
-  } else {
-    o.style.background = 'radial-gradient(circle at center,rgba(0,229,255,0.06),transparent)';
-  }
+  o.style.background = color === 'red'
+    ? 'radial-gradient(circle at center,rgba(255,23,68,0.1),rgba(255,23,68,0.02))'
+    : 'radial-gradient(circle at center,rgba(0,229,255,0.06),transparent)';
   o.style.opacity = '1';
   setTimeout(() => { o.style.opacity = '0'; }, 400);
 }
 
 // ═════════ RESET ═════════
-function resetState() {
+window.resetState = function() {
   QState.reset();
   document.getElementById('bell-info').style.display = 'none';
   document.getElementById('bell-spheres').classList.remove('active');
@@ -1412,27 +1353,20 @@ function resetState() {
     bloch: 'θ: 0° | φ: 0° | no rotation'
   });
   addLog('SYSTEM_RESET → |0⟩', 'ok');
-}
+};
 
-// ═════════ UNDO — Replay all gates from scratch ═════════
-function undoGate() {
-  if (QState.gateHistory.length === 0) {
-    addLog('UNDO: No gates to undo', 'warn');
-    return;
-  }
+// ═════════ UNDO ═════════
+window.undoGate = function() {
+  if (QState.gateHistory.length === 0) { addLog('UNDO: No gates to undo', 'warn'); return; }
   const removed = QState.gateHistory.pop();
-  const removedDef = QState.gateDefHistory.pop();
-
-  // Replay all gates from |0⟩
+  QState.gateDefHistory.pop();
   QState.alpha = new Complex(1, 0);
   QState.beta = new Complex(0, 0);
   QState.measured = false;
   QState.bellMode = false;
   trailPoints = [];
 
-  QState.gateDefHistory.forEach(gdef => {
-    QState.applyMatrix(gdef);
-  });
+  QState.gateDefHistory.forEach(gdef => { QState.applyMatrix(gdef); });
 
   updateAllUI();
   updateCircuit();
@@ -1440,18 +1374,17 @@ function undoGate() {
     updateGatePhysics(QState.gateDefHistory[QState.gateDefHistory.length - 1]);
   } else {
     updateGatePhysics({
-      label: 'IDENTITY', matStr: 'I = [[1, 0], [0, 1]]',
-      matVis: ['1','0','0','1'],
+      label: 'IDENTITY', matStr: 'I = [[1, 0], [0, 1]]', matVis: ['1','0','0','1'],
       effect: 'Identity — qubit unchanged. Starting in ground state |0⟩.',
       basis: 'No basis transformation. Computational basis preserved.',
       bloch: 'θ: 0° | φ: 0° | no rotation'
     });
   }
   addLog('UNDO: Removed ' + removed, 'warn');
-}
+};
 
 // ═════════ PRESETS ═════════
-function loadPreset(name) {
+window.loadPreset = function(name) {
   resetState();
 
   if (name === 'superposition') {
@@ -1461,8 +1394,7 @@ function loadPreset(name) {
     applyGate('X');
     addLog('PRESET_LOADED: BIT_FLIP → |1⟩', 'ok');
   } else if (name === 'phaseflip') {
-    applyGate('H');
-    applyGate('Z');
+    applyGate('H'); applyGate('Z');
     addLog('PRESET_LOADED: PHASE_FLIP → |-⟩', 'ok');
   } else if (name === 'bell') {
     QState.bellMode = true;
@@ -1487,82 +1419,104 @@ function loadPreset(name) {
     addLog('ENTANGLEMENT_ESTABLISHED — max correlation', 'ok');
     addLog('EPR pair created — "spooky action at a distance"', 'info');
   }
-}
+};
 
 // ═══════════════════════════════════════════════════════
-// THREE.JS BLOCH SPHERE — 3D rendering with trail
+// THREE.JS BLOCH SPHERE — Robust 3D rendering with OrbitControls
 // ═══════════════════════════════════════════════════════
 
-let renderer, scene, camera, stateMesh, trailLine;
+let renderer, scene, camera, controls, stateMesh, trailLine;
 let trailPoints = [];
 const TRAIL_MAX = 80;
 let currentTheta = 0, currentPhi = 0;
 let targetTheta = 0, targetPhi = 0;
-let cameraAngle = 0;
 let isVibrating = false;
 
 function initThreeJS() {
   const mount = document.getElementById('bloch-mount');
-  const canvas = document.getElementById('bloch-canvas');
   const w = mount.clientWidth, h = mount.clientHeight;
 
-  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  // Create renderer
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setSize(w, h);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setClearColor(0x000000, 0);
+  mount.insertBefore(renderer.domElement, mount.firstChild);
+  renderer.domElement.style.position = 'absolute';
+  renderer.domElement.style.top = '0';
+  renderer.domElement.style.left = '0';
+  renderer.domElement.style.width = '100%';
+  renderer.domElement.style.height = '100%';
 
   scene = new THREE.Scene();
-  camera = new THREE.PerspectiveCamera(40, w / h, 0.1, 100);
-  camera.position.set(2.5, 1.6, 2.5);
+  camera = new THREE.PerspectiveCamera(38, w / h, 0.1, 100);
+  camera.position.set(2.6, 1.8, 2.6);
   camera.lookAt(0, 0, 0);
 
-  // Translucent sphere shell
+  // OrbitControls for smooth user-driven rotation
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.enableZoom = true;
+  controls.minDistance = 2.0;
+  controls.maxDistance = 6.0;
+  controls.enablePan = false;
+  controls.autoRotate = true;
+  controls.autoRotateSpeed = 0.8;
+  controls.target.set(0, 0, 0);
+
+  // === Translucent sphere shell ===
   const sphereGeo = new THREE.SphereGeometry(1, 64, 64);
   const sphereMat = new THREE.MeshPhongMaterial({
     color: 0x002233, transparent: true, opacity: 0.12,
-    side: THREE.DoubleSide, shininess: 30
+    side: THREE.DoubleSide, shininess: 40, depthWrite: false
   });
   scene.add(new THREE.Mesh(sphereGeo, sphereMat));
 
   // Wireframe shell
-  const wireGeo = new THREE.SphereGeometry(1, 20, 20);
+  const wireGeo = new THREE.SphereGeometry(1.001, 20, 20);
   const wireMat = new THREE.MeshBasicMaterial({
-    color: 0x102030, wireframe: true, transparent: true, opacity: 0.12
+    color: 0x102030, wireframe: true, transparent: true, opacity: 0.1, depthWrite: false
   });
   scene.add(new THREE.Mesh(wireGeo, wireMat));
 
-  // Latitude rings: equator, ±30°, ±60°
+  // === Latitude rings ===
   const latAngles = [0, Math.PI/6, -Math.PI/6, Math.PI/3, -Math.PI/3];
   latAngles.forEach((lat, i) => {
     const r = Math.cos(lat);
     const y = Math.sin(lat);
-    const geo = new THREE.TorusGeometry(r, i === 0 ? 0.006 : 0.003, 8, 80);
+    const pts = [];
+    for (let j = 0; j <= 128; j++) {
+      const angle = (j / 128) * Math.PI * 2;
+      pts.push(new THREE.Vector3(r * Math.cos(angle), y, r * Math.sin(angle)));
+    }
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
     const color = i === 0 ? 0x00e5ff : 0x003344;
-    const opacity = i === 0 ? 0.35 : 0.08;
-    const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity });
-    const torus = new THREE.Mesh(geo, mat);
-    torus.position.y = y;
-    scene.add(torus);
+    const opacity = i === 0 ? 0.4 : 0.1;
+    const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity });
+    scene.add(new THREE.Line(geo, mat));
   });
 
-  // Meridian rings
-  [0, Math.PI / 4, Math.PI / 2, 3 * Math.PI / 4].forEach(angle => {
-    const geo = new THREE.TorusGeometry(1, 0.003, 8, 80);
-    const mat = new THREE.MeshBasicMaterial({ color: 0x002233, transparent: true, opacity: 0.1 });
-    const torus = new THREE.Mesh(geo, mat);
-    torus.rotation.y = angle;
-    torus.rotation.x = Math.PI / 2;
-    scene.add(torus);
+  // === Meridian rings ===
+  [0, Math.PI/4, Math.PI/2, 3*Math.PI/4].forEach(angle => {
+    const pts = [];
+    for (let j = 0; j <= 128; j++) {
+      const t = (j / 128) * Math.PI * 2;
+      pts.push(new THREE.Vector3(Math.cos(t) * Math.cos(angle), Math.sin(t), Math.cos(t) * Math.sin(angle)));
+    }
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    const mat = new THREE.LineBasicMaterial({ color: 0x002233, transparent: true, opacity: 0.12 });
+    scene.add(new THREE.Line(geo, mat));
   });
 
-  // Axes with lines
+  // === Axes ===
   const axDefs = [
-    { dir: [1, 0, 0], color: 0xff1744, len: 1.25 },
-    { dir: [-1, 0, 0], color: 0x440011, len: 1.25 },
-    { dir: [0, 1, 0], color: 0x00e676, len: 1.25 },
-    { dir: [0, -1, 0], color: 0x003311, len: 1.25 },
-    { dir: [0, 0, 1], color: 0x00e5ff, len: 1.25 },
-    { dir: [0, 0, -1], color: 0x002233, len: 1.25 }
+    { dir: [1,0,0], color: 0xff1744, len: 1.25 },
+    { dir: [-1,0,0], color: 0x440011, len: 1.25 },
+    { dir: [0,1,0], color: 0x00e676, len: 1.25 },
+    { dir: [0,-1,0], color: 0x003311, len: 1.25 },
+    { dir: [0,0,1], color: 0x00e5ff, len: 1.25 },
+    { dir: [0,0,-1], color: 0x002233, len: 1.25 }
   ];
   axDefs.forEach(a => {
     const pts = [new THREE.Vector3(0,0,0), new THREE.Vector3(...a.dir).multiplyScalar(a.len)];
@@ -1571,7 +1525,7 @@ function initThreeJS() {
     scene.add(new THREE.Line(geo, mat));
   });
 
-  // Labels
+  // === Axis labels ===
   makeLabel('|0⟩', 0, 1.55, 0, '#00e5ff', 28);
   makeLabel('|1⟩', 0, -1.55, 0, '#556666', 28);
   makeLabel('+X', 1.4, 0, 0, '#ff1744', 22);
@@ -1580,95 +1534,99 @@ function initThreeJS() {
   makeLabel('+Z', 0.15, 1.35, 0, '#006688', 18);
 
   // North/South pole dots
-  const poleGeo = new THREE.SphereGeometry(0.04, 8, 8);
+  const poleGeo = new THREE.SphereGeometry(0.04, 12, 12);
   const poleN = new THREE.Mesh(poleGeo, new THREE.MeshBasicMaterial({ color: 0x00e5ff }));
-  poleN.position.set(0, 1, 0);
-  scene.add(poleN);
+  poleN.position.set(0, 1, 0); scene.add(poleN);
   const poleS = new THREE.Mesh(poleGeo.clone(), new THREE.MeshBasicMaterial({ color: 0x444444 }));
-  poleS.position.set(0, -1, 0);
-  scene.add(poleS);
+  poleS.position.set(0, -1, 0); scene.add(poleS);
 
-  // State vector arrow group
+  // === State vector arrow group ===
   const arrowGroup = new THREE.Group();
 
-  // Shaft
-  const shaftGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.82, 12);
+  // Shaft using cylinder
+  const shaftGeo = new THREE.CylinderGeometry(0.022, 0.022, 0.84, 16);
   const shaftMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff });
   const shaft = new THREE.Mesh(shaftGeo, shaftMat);
-  shaft.position.y = 0.41;
+  shaft.position.y = 0.42;
   arrowGroup.add(shaft);
 
   // Arrowhead cone
-  const headGeo = new THREE.ConeGeometry(0.06, 0.18, 12);
+  const headGeo = new THREE.ConeGeometry(0.065, 0.18, 16);
   const headMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff });
   const head = new THREE.Mesh(headGeo, headMat);
-  head.position.y = 0.91;
+  head.position.y = 0.93;
   arrowGroup.add(head);
 
-  // Glowing tip sphere
-  const tipGeo = new THREE.SphereGeometry(0.055, 12, 12);
+  // Tip sphere (bright)
+  const tipGeo = new THREE.SphereGeometry(0.06, 16, 16);
   const tipMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
   const tip = new THREE.Mesh(tipGeo, tipMat);
-  tip.position.y = 1.0;
+  tip.position.y = 1.02;
   arrowGroup.add(tip);
 
   // Outer glow sphere
-  const glowGeo = new THREE.SphereGeometry(0.12, 12, 12);
-  const glowMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.15 });
+  const glowGeo = new THREE.SphereGeometry(0.14, 16, 16);
+  const glowMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.12, depthWrite: false });
   const glow = new THREE.Mesh(glowGeo, glowMat);
-  glow.position.y = 1.0;
+  glow.position.y = 1.02;
   arrowGroup.add(glow);
 
   stateMesh = arrowGroup;
   scene.add(stateMesh);
 
-  // Trail line
+  // === Trail line ===
   const trailGeo = new THREE.BufferGeometry();
   const trailMat = new THREE.LineBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.25 });
   trailLine = new THREE.Line(trailGeo, trailMat);
   scene.add(trailLine);
 
-  // Lighting
-  scene.add(new THREE.AmbientLight(0xffffff, 0.25));
-  const ptLight = new THREE.PointLight(0x00e5ff, 0.6, 10);
+  // === Lighting ===
+  scene.add(new THREE.AmbientLight(0xffffff, 0.3));
+  const ptLight = new THREE.PointLight(0x00e5ff, 0.7, 12);
   ptLight.position.set(3, 4, 3);
   scene.add(ptLight);
-  const ptLight2 = new THREE.PointLight(0xff1744, 0.2, 8);
-  ptLight2.position.set(-2, -1, -2);
+  const ptLight2 = new THREE.PointLight(0xff1744, 0.15, 8);
+  ptLight2.position.set(-2, -2, -2);
   scene.add(ptLight2);
 
-  // Render loop
+  // === Render loop ===
   function renderLoop() {
     requestAnimationFrame(renderLoop);
-    cameraAngle += 0.003;
-    camera.position.x = Math.cos(cameraAngle) * 3.0;
-    camera.position.z = Math.sin(cameraAngle) * 3.0;
-    camera.position.y = 1.2 + Math.sin(cameraAngle * 0.5) * 0.3;
-    camera.lookAt(0, 0, 0);
 
-    // Smooth interpolation (angular SLERP)
+    controls.update();
+
+    // Smooth interpolation
     if (!isVibrating) {
-      currentTheta += (targetTheta - currentTheta) * 0.06;
-      currentPhi   += (targetPhi   - currentPhi) * 0.06;
+      currentTheta += (targetTheta - currentTheta) * 0.07;
+      currentPhi   += (targetPhi   - currentPhi) * 0.07;
     }
     updateArrowOrientation(currentTheta, currentPhi);
-
     renderer.render(scene, camera);
   }
   renderLoop();
+
+  // Handle context loss
+  renderer.domElement.addEventListener('webglcontextlost', (e) => {
+    e.preventDefault();
+    addLog('WEBGL_CONTEXT_LOST — attempting recovery', 'err');
+  });
+  renderer.domElement.addEventListener('webglcontextrestored', () => {
+    addLog('WEBGL_CONTEXT_RESTORED', 'ok');
+  });
 }
 
 function makeLabel(text, x, y, z, color, fontSize) {
   const c = document.createElement('canvas');
-  c.width = 160; c.height = 80;
+  c.width = 200; c.height = 100;
   const ctx = c.getContext('2d');
-  ctx.font = `bold ${fontSize}px monospace`;
+  ctx.font = `bold ${fontSize}px 'Courier New', monospace`;
   ctx.fillStyle = color;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(text, 80, 40);
+  ctx.fillText(text, 100, 50);
   const tex = new THREE.CanvasTexture(c);
-  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true });
+  tex.needsUpdate = true;
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false });
   const sprite = new THREE.Sprite(mat);
   sprite.position.set(x, y, z);
   sprite.scale.set(0.5, 0.25, 1);
@@ -1681,16 +1639,25 @@ function updateArrowOrientation(theta, phi) {
   const y = Math.cos(theta);
   const dir = new THREE.Vector3(x, y, z).normalize();
   const up = new THREE.Vector3(0, 1, 0);
-  const quat = new THREE.Quaternion().setFromUnitVectors(up, dir);
-  stateMesh.setRotationFromQuaternion(quat);
 
-  // Update trail (only add point if moved enough)
-  const tip = new THREE.Vector3(x, y, z);
-  if (trailPoints.length === 0 || trailPoints[trailPoints.length-1].distanceTo(tip) > 0.01) {
-    trailPoints.push(tip);
+  if (dir.distanceTo(up) < 0.001) {
+    stateMesh.rotation.set(0, 0, 0);
+  } else if (dir.distanceTo(up.clone().negate()) < 0.001) {
+    stateMesh.rotation.set(0, 0, Math.PI);
+  } else {
+    const quat = new THREE.Quaternion().setFromUnitVectors(up, dir);
+    stateMesh.setRotationFromQuaternion(quat);
+  }
+
+  // Trail
+  const tipPos = new THREE.Vector3(x, y, z);
+  if (trailPoints.length === 0 || trailPoints[trailPoints.length-1].distanceTo(tipPos) > 0.015) {
+    trailPoints.push(tipPos);
     if (trailPoints.length > TRAIL_MAX) trailPoints.shift();
-    trailLine.geometry.dispose();
-    trailLine.geometry = new THREE.BufferGeometry().setFromPoints(trailPoints);
+    if (trailLine) {
+      trailLine.geometry.dispose();
+      trailLine.geometry = new THREE.BufferGeometry().setFromPoints(trailPoints);
+    }
   }
 }
 
@@ -1705,111 +1672,137 @@ function vibrateBloch(cb) {
   const origT = targetTheta, origP = targetPhi;
   const interval = setInterval(() => {
     t++;
-    const intensity = (1 - t / 18) * 0.4;
+    const intensity = (1 - t / 20) * 0.35;
     currentTheta = origT + (Math.random() - 0.5) * intensity;
     currentPhi = origP + (Math.random() - 0.5) * intensity;
-    if (t > 18) {
+    if (t > 20) {
       clearInterval(interval);
       isVibrating = false;
       cb();
     }
-  }, 30);
+  }, 25);
 }
 
 // ═════════ BELL STATE MINI SPHERES ═════════
 let bellRendererA, bellRendererB, bellSceneA, bellSceneB, bellCamA, bellCamB;
 let bellArrowA, bellArrowB;
 let bellInitialized = false;
+let bellAnimRunning = false;
 
 function initBellSpheres() {
-  if (bellInitialized) return;
+  if (bellInitialized) {
+    // Just start animation again if already initialized
+    return;
+  }
   bellInitialized = true;
 
   ['a', 'b'].forEach(id => {
     const mount = document.getElementById('bell-sphere-' + id);
     if (!mount) return;
-    const w = mount.clientWidth || 120, h = mount.clientHeight || 120;
-    const r = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    r.setSize(w, h);
-    r.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    r.setClearColor(0x000000, 0);
-    mount.appendChild(r.domElement);
 
-    const s = new THREE.Scene();
-    const c = new THREE.PerspectiveCamera(35, w / h, 0.1, 50);
-    c.position.set(2, 1.5, 2);
-    c.lookAt(0, 0, 0);
+    // Wait for mount to have dimensions
+    setTimeout(() => {
+      const w = mount.clientWidth || 180, h = mount.clientHeight || 140;
 
-    // Mini sphere
-    const sg = new THREE.SphereGeometry(0.8, 24, 24);
-    const sm = new THREE.MeshBasicMaterial({ color: 0x001122, wireframe: true, transparent: true, opacity: 0.2 });
-    s.add(new THREE.Mesh(sg, sm));
+      const r = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      r.setSize(w, h);
+      r.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      r.setClearColor(0x000000, 0);
+      r.domElement.style.width = '100%';
+      r.domElement.style.height = '100%';
+      mount.appendChild(r.domElement);
 
-    // Equator
-    const tg = new THREE.TorusGeometry(0.8, 0.005, 6, 48);
-    const tm = new THREE.MeshBasicMaterial({ color: 0x7c4dff, transparent: true, opacity: 0.3 });
-    s.add(new THREE.Mesh(tg, tm));
+      const s = new THREE.Scene();
+      const c = new THREE.PerspectiveCamera(35, w / h, 0.1, 50);
+      c.position.set(2, 1.5, 2);
+      c.lookAt(0, 0, 0);
 
-    // Arrow
-    const ag = new THREE.Group();
-    const shaft = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.02, 0.02, 0.6, 8),
-      new THREE.MeshBasicMaterial({ color: id === 'a' ? 0x00e5ff : 0xb388ff })
-    );
-    shaft.position.y = 0.3;
-    ag.add(shaft);
-    const cone = new THREE.Mesh(
-      new THREE.ConeGeometry(0.05, 0.15, 8),
-      new THREE.MeshBasicMaterial({ color: id === 'a' ? 0x00e5ff : 0xb388ff })
-    );
-    cone.position.y = 0.68;
-    ag.add(cone);
-    // Tip glow
-    const tipGlow = new THREE.Mesh(
-      new THREE.SphereGeometry(0.04, 8, 8),
-      new THREE.MeshBasicMaterial({ color: id === 'a' ? 0x00ffff : 0xb388ff })
-    );
-    tipGlow.position.y = 0.75;
-    ag.add(tipGlow);
+      // Mini sphere wireframe
+      const sg = new THREE.SphereGeometry(0.8, 20, 20);
+      const sm = new THREE.MeshBasicMaterial({ color: 0x001122, wireframe: true, transparent: true, opacity: 0.2 });
+      s.add(new THREE.Mesh(sg, sm));
 
-    s.add(ag);
-    s.add(new THREE.AmbientLight(0xffffff, 0.3));
+      // Equator ring
+      const eqPts = [];
+      for (let j = 0; j <= 64; j++) {
+        const angle = (j / 64) * Math.PI * 2;
+        eqPts.push(new THREE.Vector3(0.8 * Math.cos(angle), 0, 0.8 * Math.sin(angle)));
+      }
+      const eqGeo = new THREE.BufferGeometry().setFromPoints(eqPts);
+      const eqMat = new THREE.LineBasicMaterial({ color: 0x7c4dff, transparent: true, opacity: 0.3 });
+      s.add(new THREE.Line(eqGeo, eqMat));
 
-    if (id === 'a') {
-      bellRendererA = r; bellSceneA = s; bellCamA = c; bellArrowA = ag;
-    } else {
-      bellRendererB = r; bellSceneB = s; bellCamB = c; bellArrowB = ag;
-    }
+      // Arrow
+      const ag = new THREE.Group();
+      const shaftColor = id === 'a' ? 0x00e5ff : 0xb388ff;
+      const shaft = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.02, 0.02, 0.6, 12),
+        new THREE.MeshBasicMaterial({ color: shaftColor })
+      );
+      shaft.position.y = 0.3; ag.add(shaft);
+
+      const cone = new THREE.Mesh(
+        new THREE.ConeGeometry(0.05, 0.15, 12),
+        new THREE.MeshBasicMaterial({ color: shaftColor })
+      );
+      cone.position.y = 0.68; ag.add(cone);
+
+      const tipGlow = new THREE.Mesh(
+        new THREE.SphereGeometry(0.045, 12, 12),
+        new THREE.MeshBasicMaterial({ color: shaftColor })
+      );
+      tipGlow.position.y = 0.75; ag.add(tipGlow);
+
+      s.add(ag);
+      s.add(new THREE.AmbientLight(0xffffff, 0.4));
+
+      if (id === 'a') {
+        bellRendererA = r; bellSceneA = s; bellCamA = c; bellArrowA = ag;
+      } else {
+        bellRendererB = r; bellSceneB = s; bellCamB = c; bellArrowB = ag;
+      }
+    }, 100);
   });
 
-  // Animate bell spheres — both arrows move in sync (entanglement visualization)
-  let bellAngle = 0;
-  function animBell() {
-    requestAnimationFrame(animBell);
-    bellAngle += 0.01;
+  // Start bell animation after slight delay
+  setTimeout(() => {
+    if (!bellAnimRunning) {
+      bellAnimRunning = true;
+      let bellAngle = 0;
+      function animBell() {
+        requestAnimationFrame(animBell);
+        bellAngle += 0.01;
 
-    if (bellArrowA && bellArrowB) {
-      const up = new THREE.Vector3(0, 1, 0);
-      // Both arrows wobble in sync (entangled correlation)
-      const bobble = Math.sin(bellAngle * 2) * 0.2;
-      const dirA = new THREE.Vector3(Math.sin(bobble), Math.cos(bobble), Math.sin(bellAngle * 1.5) * 0.1).normalize();
-      const qA = new THREE.Quaternion().setFromUnitVectors(up, dirA);
-      bellArrowA.setRotationFromQuaternion(qA);
-      // B mirrors A exactly (correlation)
-      bellArrowB.setRotationFromQuaternion(qA);
+        if (bellArrowA && bellArrowB) {
+          const up = new THREE.Vector3(0, 1, 0);
+          const bobble = Math.sin(bellAngle * 2) * 0.3;
+          const dirA = new THREE.Vector3(
+            Math.sin(bobble),
+            Math.cos(bobble),
+            Math.sin(bellAngle * 1.5) * 0.15
+          ).normalize();
+          const qA = new THREE.Quaternion().setFromUnitVectors(up, dirA);
+          bellArrowA.setRotationFromQuaternion(qA);
+          bellArrowB.setRotationFromQuaternion(qA);
 
-      bellCamA.position.x = Math.cos(bellAngle * 0.5) * 2.5;
-      bellCamA.position.z = Math.sin(bellAngle * 0.5) * 2.5;
-      bellCamA.lookAt(0, 0, 0);
-      bellCamB.position.x = Math.cos(bellAngle * 0.5 + Math.PI) * 2.5;
-      bellCamB.position.z = Math.sin(bellAngle * 0.5 + Math.PI) * 2.5;
-      bellCamB.lookAt(0, 0, 0);
+          if (bellCamA) {
+            bellCamA.position.x = Math.cos(bellAngle * 0.5) * 2.5;
+            bellCamA.position.z = Math.sin(bellAngle * 0.5) * 2.5;
+            bellCamA.lookAt(0, 0, 0);
+          }
+          if (bellCamB) {
+            bellCamB.position.x = Math.cos(bellAngle * 0.5 + Math.PI) * 2.5;
+            bellCamB.position.z = Math.sin(bellAngle * 0.5 + Math.PI) * 2.5;
+            bellCamB.lookAt(0, 0, 0);
+          }
+        }
+
+        if (bellRendererA && bellSceneA && bellCamA) bellRendererA.render(bellSceneA, bellCamA);
+        if (bellRendererB && bellSceneB && bellCamB) bellRendererB.render(bellSceneB, bellCamB);
+      }
+      animBell();
     }
-
-    if (bellRendererA) bellRendererA.render(bellSceneA, bellCamA);
-    if (bellRendererB) bellRendererB.render(bellSceneB, bellCamB);
-  }
-  animBell();
+  }, 300);
 }
 
 // ═════════ SYS LOG ═════════
@@ -1822,17 +1815,13 @@ function addLog(msg, type) {
   line.innerHTML = `<span class="log-time">${ts}</span><span class="log-${type}">› ${msg}</span>`;
   el.appendChild(line);
   el.scrollTop = el.scrollHeight;
-
-  // Keep max 150 lines
   while (el.children.length > 150) el.removeChild(el.firstChild);
 }
-
 function pad(n) { return String(n).padStart(2, '0'); }
 
-// ═════════ AI EXPLAIN ENGINE — Structured physics explanation ═════════
-function explainState() {
+// ═════════ AI EXPLAIN ENGINE ═════════
+window.explainState = function() {
   const box = document.getElementById('ai-explain-box');
-
   const p0 = QState.p0, p1 = QState.p1;
   const thetaDeg = (QState.theta * 180 / Math.PI).toFixed(1);
   const phiDeg = (QState.phi * 180 / Math.PI).toFixed(1);
@@ -1847,7 +1836,7 @@ function explainState() {
   } else if (QState.measured) {
     basis = `Collapsed eigenstate |${QState.collapsedTo}⟩ — no superposition remains.`;
     physics = `Measurement destroyed the quantum superposition. Qubit is now in a definite classical state — the wavefunction has irreversibly collapsed.`;
-    measurement = `Will always yield |${QState.collapsedTo}⟩ with 100% certainty until reset. No quantum randomness.`;
+    measurement = `Will always yield |${QState.collapsedTo}⟩ with 100% certainty until reset.`;
   } else if (p0 > 0.999) {
     basis = `Ground state |0⟩ — qubit at north pole of Bloch sphere (θ=0°).`;
     physics = gates === 'None'
@@ -1860,7 +1849,7 @@ function explainState() {
     measurement = `Will collapse to |1⟩ with 100% certainty. Deterministic outcome.`;
   } else if (Math.abs(p0 - 0.5) < 0.01) {
     basis = `Equal superposition — qubit exists as both |0⟩ and |1⟩ simultaneously.`;
-    physics = `Gate sequence [${gates}] created maximum superposition. Bloch vector lies on equator at θ=${thetaDeg}°, φ=${phiDeg}°. Maximum von Neumann entropy (1 bit).`;
+    physics = `Gate sequence [${gates}] created maximum superposition. Bloch vector on equator at θ=${thetaDeg}°, φ=${phiDeg}°. Maximum von Neumann entropy (1 bit).`;
     measurement = `Will randomly collapse to |0⟩ or |1⟩ with equal 50% probability. Maximum quantum randomness.`;
   } else {
     const dominant = p0 > p1 ? '0' : '1';
@@ -1872,9 +1861,8 @@ function explainState() {
   box.innerHTML = `<div style="margin-bottom:4px;"><span style="color:var(--cyan);font-size:8px;letter-spacing:2px;font-family:var(--font-main);">CURRENT_STATE</span><br/>${basis}</div>`
     + `<div style="margin-bottom:4px;"><span style="color:var(--green);font-size:8px;letter-spacing:2px;font-family:var(--font-main);">PHYSICS</span><br/>${physics}</div>`
     + `<div><span style="color:var(--amber);font-size:8px;letter-spacing:2px;font-family:var(--font-main);">MEASUREMENT</span><br/>${measurement}</div>`;
-
   addLog('STATE_EXPLAINED — analysis complete', 'ok');
-}
+};
 
 // ═════════ CHALLENGE MODE ═════════
 const CHALLENGES = [
@@ -1901,14 +1889,14 @@ let challengeIdx = 0;
 let challengeScore = 0;
 let challengeTotal = 0;
 
-function toggleChallenge() {
+window.toggleChallenge = function() {
   challengeActive = !challengeActive;
   document.getElementById('challenge-panel').style.display = challengeActive ? 'block' : 'none';
   const btn = document.getElementById('challenge-toggle');
   btn.textContent = challengeActive ? 'CHALLENGE [ON]' : 'CHALLENGE [F3]';
   if (challengeActive) loadChallenge();
   addLog('CHALLENGE_MODE: ' + (challengeActive ? 'ACTIVATED' : 'DEACTIVATED'), 'sys');
-}
+};
 
 function loadChallenge() {
   currentChallenge = CHALLENGES[challengeIdx % CHALLENGES.length];
@@ -1918,8 +1906,7 @@ function loadChallenge() {
   optsEl.innerHTML = '';
   currentChallenge.opts.forEach((opt, i) => {
     const btn = document.createElement('div');
-    btn.className = 'c-opt';
-    btn.textContent = opt;
+    btn.className = 'c-opt'; btn.textContent = opt;
     btn.onclick = () => checkAnswer(i);
     optsEl.appendChild(btn);
   });
@@ -1953,7 +1940,6 @@ function updateClock() {
   const now = new Date();
   document.getElementById('sys-clock').textContent =
     pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
-
   const upSec = Math.floor((Date.now() - startTime) / 1000);
   const m = Math.floor(upSec / 60), s = upSec % 60;
   document.getElementById('uptime').textContent = (m > 0 ? m + 'm ' : '') + s + 's';
@@ -1975,7 +1961,6 @@ document.addEventListener('keydown', (e) => {
   else if (key === 'E') explainState();
   else if (key === 'U') undoGate();
   else if (key === 'B') loadPreset('bell');
-  else if (e.key === 'F1') { e.preventDefault(); }
   else if (e.key === 'F3') { e.preventDefault(); toggleChallenge(); }
 });
 
@@ -1991,24 +1976,30 @@ window.addEventListener('resize', () => {
 
 // ═════════ INITIALIZATION ═════════
 window.addEventListener('load', () => {
-  initThreeJS();
+  try {
+    initThreeJS();
+    addLog('THREE.JS_RENDERER_MOUNTED — WebGL', 'ok');
+  } catch(e) {
+    addLog('THREE.JS_INIT_ERROR: ' + e.message, 'err');
+    console.error('Three.js init error:', e);
+  }
+
   updateClock();
   updateAllUI();
 
-  // Boot sequence log (staggered for theatrical effect)
-  addLog('SYSTEM_BOOT_SEQUENCE_INITIATED', 'sys');
-  setTimeout(() => addLog('THREE.JS_RENDERER_MOUNTED — WebGL2', 'ok'), 200);
-  setTimeout(() => addLog('QUANTUM_ENGINE_v2.1_LOADED', 'ok'), 400);
-  setTimeout(() => addLog('COMPLEX_MATH_ENGINE_READY', 'ok'), 600);
-  setTimeout(() => addLog('BLOCH_SPHERE_3D_INITIALIZED', 'ok'), 800);
-  setTimeout(() => addLog('GATE_LIBRARY: H X Y Z S T Rx Ry', 'info'), 1000);
-  setTimeout(() => addLog('BELL_STATE_ENGINE_LOADED', 'info'), 1200);
-  setTimeout(() => addLog('CHALLENGE_MODE_AVAILABLE [F3]', 'info'), 1400);
-  setTimeout(() => addLog('QUBIT_STATE → |0⟩ GROUND', 'info'), 1600);
-  setTimeout(() => addLog('KEYBOARD_SHORTCUTS_ACTIVE', 'info'), 1800);
-  setTimeout(() => addLog('MEASUREMENT_HISTOGRAM_READY', 'ok'), 2000);
-  setTimeout(() => addLog('SYSTEM_READY — awaiting input...', 'ok'), 2200);
-  setTimeout(() => addLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'sys'), 2400);
+  // Boot sequence
+  setTimeout(() => addLog('SYSTEM_BOOT_SEQUENCE_INITIATED', 'sys'), 100);
+  setTimeout(() => addLog('QUANTUM_ENGINE_v2.1_LOADED', 'ok'), 300);
+  setTimeout(() => addLog('COMPLEX_MATH_ENGINE_READY', 'ok'), 500);
+  setTimeout(() => addLog('BLOCH_SPHERE_3D_INITIALIZED', 'ok'), 700);
+  setTimeout(() => addLog('GATE_LIBRARY: H X Y Z S T Rx Ry', 'info'), 900);
+  setTimeout(() => addLog('BELL_STATE_ENGINE_LOADED', 'info'), 1100);
+  setTimeout(() => addLog('CHALLENGE_MODE_AVAILABLE [F3]', 'info'), 1300);
+  setTimeout(() => addLog('QUBIT_STATE → |0⟩ GROUND', 'info'), 1500);
+  setTimeout(() => addLog('KEYBOARD_SHORTCUTS_ACTIVE', 'info'), 1700);
+  setTimeout(() => addLog('MEASUREMENT_HISTOGRAM_READY', 'ok'), 1900);
+  setTimeout(() => addLog('SYSTEM_READY — awaiting input...', 'ok'), 2100);
+  setTimeout(() => addLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'sys'), 2300);
 });
 </script>
 </body>
