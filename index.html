@@ -1,0 +1,1746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>QUANTUMSCOPE // QS-01 — Interactive Quantum State Evolution Lab</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#050810;
+  --bg2:#0a1018;
+  --bg3:#0d1520;
+  --bg4:#111e2c;
+  --border:#152030;
+  --border2:#1e3040;
+  --border3:#2a4055;
+  --cyan:#00e5ff;
+  --cyan2:#00b8d4;
+  --cyan3:#0097a7;
+  --cyan-dim:rgba(0,229,255,0.06);
+  --cyan-glow:rgba(0,229,255,0.12);
+  --cyan-bright:rgba(0,229,255,0.25);
+  --green:#00e676;
+  --green2:#00c853;
+  --green-dim:rgba(0,230,118,0.06);
+  --amber:#ffab00;
+  --amber2:#ff8f00;
+  --amber-dim:rgba(255,171,0,0.06);
+  --red:#ff1744;
+  --red2:#d50000;
+  --red-dim:rgba(255,23,68,0.06);
+  --purple:#b388ff;
+  --purple2:#7c4dff;
+  --purple-dim:rgba(179,136,255,0.06);
+  --pink:#ff80ab;
+  --pink2:#f50057;
+  --pink-dim:rgba(255,128,171,0.06);
+  --text:#c8d8e8;
+  --text2:#6a8a9a;
+  --text3:#3a5a6a;
+  --text4:#2a3a4a;
+  --white:#e8f0f8;
+  --font-main:'Orbitron',sans-serif;
+  --font-mono:'Share Tech Mono',monospace;
+}
+
+html,body{height:100%;overflow:hidden;}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:var(--font-mono);font-size:12px;
+}
+
+/* Scanline overlay */
+body::before{
+  content:'';position:fixed;inset:0;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.015) 2px,rgba(0,0,0,0.015) 4px);
+  pointer-events:none;z-index:9999;
+}
+
+/* Grid background */
+body::after{
+  content:'';position:fixed;inset:0;
+  background-image:
+    linear-gradient(rgba(0,229,255,0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,229,255,0.015) 1px, transparent 1px);
+  background-size:40px 40px;
+  pointer-events:none;z-index:-1;
+}
+
+/* ===== TOPBAR ===== */
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 16px;
+  border-bottom:1px solid var(--border2);
+  background:linear-gradient(180deg,var(--bg2),var(--bg));
+  position:relative;height:48px;flex-shrink:0;
+}
+.topbar::after{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent 5%,var(--cyan3) 30%,var(--cyan) 50%,var(--cyan3) 70%,transparent 95%);
+  opacity:0.4;
+}
+.logo-wrap{display:flex;flex-direction:column;}
+.logo{
+  font-family:var(--font-main);font-size:14px;font-weight:700;
+  letter-spacing:5px;color:var(--white);
+  text-shadow:0 0 20px rgba(0,229,255,0.3);
+}
+.logo span{color:var(--cyan);}
+.logo-sub{font-size:9px;letter-spacing:3px;color:var(--text3);margin-top:1px;}
+.nav{display:flex;gap:6px;align-items:center;}
+
+.pill{
+  font-size:8px;padding:3px 10px;border:1px solid;
+  letter-spacing:1.5px;font-family:var(--font-main);
+  cursor:pointer;transition:all 0.2s;user-select:none;
+}
+.pill-cyan{border-color:var(--cyan3);color:var(--cyan2);background:var(--cyan-dim);}
+.pill-cyan:hover{background:var(--cyan-glow);color:var(--cyan);}
+.pill-cyan.active{background:var(--cyan-glow);color:var(--cyan);box-shadow:0 0 8px rgba(0,229,255,0.15);}
+.pill-green{border-color:var(--green2);color:var(--green);background:var(--green-dim);}
+.pill-amber{border-color:var(--amber2);color:var(--amber);background:var(--amber-dim);}
+.pill-amber:hover{background:rgba(255,171,0,0.12);}
+.pill-red{border-color:var(--red2);color:var(--red);background:var(--red-dim);}
+
+.sys-clock{
+  font-size:10px;color:var(--text3);letter-spacing:1px;
+  font-family:var(--font-mono);margin-left:8px;
+}
+
+/* ===== MAIN LAYOUT ===== */
+.layout{
+  display:grid;
+  grid-template-columns:240px 1fr 270px;
+  gap:8px;padding:8px;
+  height:calc(100vh - 48px);
+  overflow:hidden;
+}
+.col{display:flex;flex-direction:column;gap:6px;overflow:hidden;min-height:0;}
+
+/* ===== PANEL ===== */
+.panel{
+  border:1px solid var(--border2);
+  background:var(--bg2);
+  display:flex;flex-direction:column;
+  overflow:hidden;position:relative;
+}
+/* Corner brackets */
+.panel::before,.panel::after{
+  content:'';position:absolute;width:8px;height:8px;
+  border-color:var(--cyan3);border-style:solid;
+  pointer-events:none;z-index:2;
+}
+.panel::before{top:-1px;left:-1px;border-width:1px 0 0 1px;}
+.panel::after{top:-1px;right:-1px;border-width:1px 1px 0 0;}
+
+.panel-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:5px 10px;border-bottom:1px solid var(--border);
+  background:var(--bg3);flex-shrink:0;
+  position:relative;
+}
+.panel-head::after{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--cyan3),transparent);
+  opacity:0.15;
+}
+.panel-title{
+  font-size:8px;letter-spacing:2.5px;color:var(--text2);
+  font-family:var(--font-main);text-transform:uppercase;
+}
+.panel-body{
+  padding:8px 10px;flex:1;overflow-y:auto;overflow-x:hidden;
+}
+.panel-body::-webkit-scrollbar{width:3px;}
+.panel-body::-webkit-scrollbar-track{background:var(--bg);}
+.panel-body::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+
+/* ===== STATE DISPLAY ===== */
+.eq-box{
+  text-align:center;padding:10px 8px;
+  border:1px solid var(--cyan3);
+  background:linear-gradient(135deg,var(--cyan-dim),rgba(0,229,255,0.02));
+  margin-bottom:8px;position:relative;
+}
+.eq-box::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(0,229,255,0.04),transparent);
+  pointer-events:none;
+}
+.eq-main{
+  font-size:13px;font-weight:500;color:var(--cyan);
+  letter-spacing:0.5px;font-family:var(--font-mono);
+  text-shadow:0 0 12px rgba(0,229,255,0.3);
+  word-break:break-all;
+}
+.eq-sub{font-size:9px;color:var(--text2);margin-top:4px;letter-spacing:1.5px;font-family:var(--font-main);}
+
+.val-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px;}
+.val-box{
+  background:var(--bg3);border:1px solid var(--border);
+  padding:6px 4px;text-align:center;
+}
+.val-label{font-size:7px;color:var(--text3);letter-spacing:1.5px;font-family:var(--font-main);}
+.val-num{font-size:12px;font-weight:500;margin-top:2px;font-family:var(--font-main);}
+.val-num.alpha{color:var(--cyan);}
+.val-num.beta{color:var(--amber);}
+.val-num.p0{color:var(--green);}
+.val-num.p1{color:var(--red);}
+
+/* Full amplitude display */
+.amp-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px;}
+.amp-box{
+  background:var(--bg3);border:1px solid var(--border);
+  padding:5px 6px;
+}
+.amp-label{font-size:7px;color:var(--text3);letter-spacing:1px;font-family:var(--font-main);}
+.amp-val{font-size:10px;margin-top:2px;color:var(--text);letter-spacing:0.5px;}
+.amp-val .re{color:var(--cyan);}
+.amp-val .im{color:var(--purple);}
+
+/* ===== BUTTONS ===== */
+.btn-row{display:flex;gap:4px;margin-bottom:5px;}
+.qbtn{
+  flex:1;padding:6px 4px;font-size:8px;letter-spacing:1.5px;
+  border:1px solid var(--border2);background:var(--bg3);
+  cursor:pointer;color:var(--text);transition:all 0.15s;
+  font-family:var(--font-main);text-align:center;user-select:none;
+}
+.qbtn:hover{background:var(--bg4);color:var(--white);}
+.qbtn:active{transform:scale(0.97);}
+.qbtn.measure{border-color:var(--red2);color:var(--red);background:var(--red-dim);}
+.qbtn.measure:hover{background:rgba(255,23,68,0.15);box-shadow:0 0 12px rgba(255,23,68,0.15);}
+.qbtn.reset{border-color:var(--text3);color:var(--text2);}
+.qbtn.reset:hover{border-color:var(--text2);color:var(--text);}
+.qbtn.explain{border-color:var(--cyan3);color:var(--cyan2);background:var(--cyan-dim);}
+.qbtn.explain:hover{background:var(--cyan-glow);color:var(--cyan);}
+.qbtn.full{width:100%;flex:none;}
+
+/* ===== GATES ===== */
+.gates-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin-top:5px;}
+.gate{
+  padding:7px 3px;text-align:center;font-size:11px;font-weight:700;
+  border:1px solid var(--border2);background:var(--bg3);
+  cursor:pointer;letter-spacing:1px;transition:all 0.15s;
+  font-family:var(--font-main);position:relative;user-select:none;
+}
+.gate:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,0.5);}
+.gate:active{transform:translateY(0) scale(0.95);}
+.gate.H{color:var(--cyan);border-color:var(--cyan3);}
+.gate.H:hover{background:var(--cyan-dim);box-shadow:0 0 12px rgba(0,229,255,0.15);}
+.gate.X{color:var(--red);border-color:var(--red2);}
+.gate.X:hover{background:var(--red-dim);box-shadow:0 0 12px rgba(255,23,68,0.15);}
+.gate.Y{color:var(--amber);border-color:var(--amber2);}
+.gate.Y:hover{background:var(--amber-dim);box-shadow:0 0 12px rgba(255,171,0,0.15);}
+.gate.Z{color:var(--green);border-color:var(--green2);}
+.gate.Z:hover{background:var(--green-dim);box-shadow:0 0 12px rgba(0,230,118,0.15);}
+.gate.S{color:var(--purple);border-color:var(--purple2);}
+.gate.S:hover{background:var(--purple-dim);box-shadow:0 0 12px rgba(179,136,255,0.15);}
+.gate.T{color:var(--pink);border-color:var(--pink2);}
+.gate.T:hover{background:var(--pink-dim);box-shadow:0 0 12px rgba(255,128,171,0.15);}
+.gate.Rx{color:#64ffda;border-color:#00bfa5;}
+.gate.Rx:hover{background:rgba(100,255,218,0.06);}
+.gate.Ry{color:#ffd54f;border-color:#f9a825;}
+.gate.Ry:hover{background:rgba(255,213,79,0.06);}
+
+/* Gate tooltip */
+.gate[data-tip]{position:relative;}
+.gate[data-tip]:hover::after{
+  content:attr(data-tip);
+  position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);
+  background:var(--bg2);border:1px solid var(--border2);
+  padding:3px 8px;font-size:8px;color:var(--text);white-space:nowrap;
+  letter-spacing:0.5px;font-family:var(--font-mono);
+  z-index:100;font-weight:normal;
+  box-shadow:0 4px 12px rgba(0,0,0,0.4);
+}
+
+/* ===== CIRCUIT WIRE ===== */
+.circuit-wire{
+  background:var(--bg3);border:1px solid var(--border);
+  padding:6px 8px;display:flex;align-items:center;
+  gap:3px;flex-wrap:wrap;min-height:34px;margin-bottom:6px;
+  position:relative;overflow:hidden;
+}
+.circuit-wire::before{
+  content:'';position:absolute;top:50%;left:0;right:0;height:1px;
+  background:var(--border2);z-index:0;
+}
+.wire-init,.wire-end{
+  font-size:9px;color:var(--text3);letter-spacing:1px;
+  position:relative;z-index:1;background:var(--bg3);padding:0 2px;
+}
+.gate-chip{
+  font-size:8px;padding:2px 6px;letter-spacing:1px;font-weight:700;
+  border:1px solid var(--cyan3);color:var(--cyan);background:var(--cyan-dim);
+  font-family:var(--font-main);position:relative;z-index:1;
+}
+.gate-chip.X-chip{border-color:var(--red2);color:var(--red);background:var(--red-dim);}
+.gate-chip.Y-chip{border-color:var(--amber2);color:var(--amber);background:var(--amber-dim);}
+.gate-chip.Z-chip{border-color:var(--green2);color:var(--green);background:var(--green-dim);}
+.gate-chip.S-chip{border-color:var(--purple2);color:var(--purple);background:var(--purple-dim);}
+.gate-chip.T-chip{border-color:var(--pink2);color:var(--pink);background:var(--pink-dim);}
+.gate-chip.CNOT-chip{border-color:var(--amber2);color:var(--amber);background:var(--amber-dim);}
+
+/* ===== BLOCH SPHERE ===== */
+#bloch-mount{
+  width:100%;flex:1;min-height:200px;
+  background:radial-gradient(circle at center,var(--bg3),var(--bg));
+  border:1px solid var(--border2);
+  position:relative;overflow:hidden;
+}
+#bloch-mount::before{
+  content:'BLOCH_SPHERE_3D';position:absolute;top:6px;left:8px;
+  font-size:8px;color:var(--text3);letter-spacing:2px;font-family:var(--font-main);
+  z-index:5;
+}
+#bloch-canvas{width:100%;height:100%;display:block;}
+
+/* Bloch info overlays */
+.bloch-info{
+  position:absolute;bottom:6px;left:8px;z-index:5;
+  display:flex;gap:8px;
+}
+.bloch-stat{
+  font-size:9px;color:var(--text2);letter-spacing:0.5px;
+}
+.bloch-stat span{color:var(--cyan);font-family:var(--font-main);}
+
+/* ===== PROBABILITY BARS ===== */
+.prob-section{margin-top:6px;}
+.prob-bars{display:flex;flex-direction:column;gap:5px;}
+.prob-row{display:flex;align-items:center;gap:6px;}
+.prob-lbl{
+  font-size:9px;color:var(--text2);min-width:22px;
+  letter-spacing:1px;font-family:var(--font-main);
+}
+.prob-track{
+  flex:1;height:10px;background:var(--bg3);
+  border:1px solid var(--border);overflow:hidden;
+  position:relative;
+}
+.prob-fill-0{
+  height:100%;
+  background:linear-gradient(90deg,var(--green2),var(--green));
+  transition:width 0.6s cubic-bezier(.4,0,.2,1);
+  box-shadow:0 0 8px rgba(0,230,118,0.3);
+}
+.prob-fill-1{
+  height:100%;
+  background:linear-gradient(90deg,var(--red2),var(--red));
+  transition:width 0.6s cubic-bezier(.4,0,.2,1);
+  box-shadow:0 0 8px rgba(255,23,68,0.3);
+}
+.prob-pct{
+  font-size:10px;color:var(--text2);min-width:36px;
+  text-align:right;font-family:var(--font-main);
+}
+
+/* ===== PRESETS ===== */
+.presets-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;}
+.preset{
+  padding:6px;font-size:8px;letter-spacing:1px;text-align:center;
+  border:1px solid var(--amber2);background:var(--amber-dim);
+  cursor:pointer;color:var(--amber);transition:all 0.15s;
+  font-family:var(--font-main);user-select:none;
+}
+.preset:hover{background:rgba(255,171,0,0.12);color:var(--white);}
+.preset:active{transform:scale(0.95);}
+.preset.bell{border-color:var(--purple2);color:var(--purple);background:var(--purple-dim);}
+.preset.bell:hover{background:rgba(179,136,255,0.12);}
+
+/* ===== RIGHT PANEL ===== */
+.matrix-box{
+  background:var(--bg3);border:1px solid var(--border);
+  padding:6px 8px;margin-bottom:5px;
+}
+.m-label{font-size:7px;color:var(--text3);letter-spacing:2px;margin-bottom:3px;font-family:var(--font-main);}
+.m-val{font-size:10px;color:var(--cyan);letter-spacing:0.3px;}
+.m-val span{color:var(--text2);}
+
+/* Matrix visual */
+.matrix-visual{
+  display:grid;grid-template-columns:1fr 1fr;gap:2px;
+  margin-top:4px;
+}
+.mat-cell{
+  text-align:center;padding:3px;font-size:10px;
+  background:var(--bg);border:1px solid var(--border);
+  color:var(--cyan);font-family:var(--font-mono);
+}
+
+.exp-box{
+  background:var(--bg3);border-left:2px solid var(--cyan3);
+  padding:6px 8px;font-size:10px;line-height:1.6;
+  color:var(--text2);margin-bottom:5px;
+}
+.exp-lbl{font-size:7px;letter-spacing:2px;color:var(--text3);margin-bottom:3px;font-family:var(--font-main);}
+
+/* ===== SYS LOG ===== */
+.syslog{font-size:10px;line-height:1.8;overflow-y:auto;max-height:100%;}
+.syslog::-webkit-scrollbar{width:2px;}
+.syslog::-webkit-scrollbar-thumb{background:var(--border2);}
+.log-line{display:flex;gap:6px;padding:0 0 1px 0;}
+.log-time{color:var(--text3);min-width:56px;flex-shrink:0;font-size:9px;}
+.log-ok{color:var(--green);}
+.log-info{color:var(--cyan);}
+.log-warn{color:var(--amber);}
+.log-err{color:var(--red);}
+.log-sys{color:var(--purple);}
+
+/* ===== CHALLENGE ===== */
+.challenge-box{
+  background:var(--amber-dim);border:1px solid var(--amber2);
+  padding:8px;margin-top:6px;
+}
+.challenge-q{
+  font-size:9px;color:var(--amber);line-height:1.6;
+  margin-bottom:6px;font-family:var(--font-main);letter-spacing:0.5px;
+}
+.challenge-opts{display:grid;grid-template-columns:1fr 1fr;gap:3px;}
+.c-opt{
+  padding:5px;font-size:8px;text-align:center;
+  border:1px solid var(--amber2);background:var(--bg3);
+  cursor:pointer;color:var(--amber);font-family:var(--font-main);
+  transition:all 0.15s;letter-spacing:1px;user-select:none;
+}
+.c-opt:hover{background:var(--amber-dim);}
+.c-opt.correct{background:rgba(0,230,118,0.15);border-color:var(--green);color:var(--green);
+  box-shadow:0 0 8px rgba(0,230,118,0.2);}
+.c-opt.wrong{background:rgba(255,23,68,0.15);border-color:var(--red);color:var(--red);
+  box-shadow:0 0 8px rgba(255,23,68,0.2);}
+
+/* ===== BELL STATE ===== */
+#bell-info{display:none;}
+#bell-info .exp-box{border-color:var(--purple2);background:var(--purple-dim);}
+.bell-spheres{
+  display:none;gap:8px;margin-top:6px;
+}
+.bell-spheres.active{display:grid;grid-template-columns:1fr 1fr;}
+.bell-label{
+  font-size:8px;color:var(--purple);letter-spacing:1.5px;
+  text-align:center;font-family:var(--font-main);padding:4px 0;
+}
+.bell-sphere-mini{
+  height:120px;border:1px solid var(--border2);
+  background:var(--bg3);position:relative;
+}
+
+/* ===== COLLAPSE OVERLAY ===== */
+#collapse-overlay{
+  position:fixed;inset:0;
+  background:radial-gradient(circle at center,rgba(255,23,68,0.08),rgba(255,23,68,0.02));
+  pointer-events:none;z-index:1000;opacity:0;
+  transition:opacity 0.3s;
+}
+
+/* ===== NORMALIZATION CHECK ===== */
+.norm-bar{
+  height:3px;background:var(--bg3);border:1px solid var(--border);
+  margin-bottom:6px;overflow:hidden;
+}
+.norm-fill{height:100%;background:var(--green);transition:width 0.3s;width:100%;}
+.norm-fill.warn{background:var(--amber);}
+.norm-fill.err{background:var(--red);}
+
+/* ===== MISC ===== */
+.divider{height:1px;background:var(--border);margin:5px 0;}
+.section-label{
+  font-size:7px;letter-spacing:2px;color:var(--text3);
+  font-family:var(--font-main);margin:4px 0 3px;
+}
+
+/* Rx/Ry angle input */
+.angle-input-wrap{
+  display:none;align-items:center;gap:4px;margin-top:4px;
+  padding:4px 6px;background:var(--bg3);border:1px solid var(--border);
+}
+.angle-input-wrap.show{display:flex;}
+.angle-input-wrap label{font-size:8px;color:var(--text2);letter-spacing:1px;font-family:var(--font-main);}
+.angle-input{
+  flex:1;background:var(--bg);border:1px solid var(--border2);
+  color:var(--cyan);font-family:var(--font-mono);font-size:10px;
+  padding:3px 6px;outline:none;
+}
+.angle-input:focus{border-color:var(--cyan3);}
+.angle-apply{
+  padding:3px 8px;font-size:8px;border:1px solid var(--cyan3);
+  background:var(--cyan-dim);color:var(--cyan);cursor:pointer;
+  font-family:var(--font-main);letter-spacing:1px;
+}
+
+/* Stats ticker */
+.stats-ticker{
+  display:flex;gap:12px;padding:4px 8px;
+  background:var(--bg3);border:1px solid var(--border);
+  margin-bottom:6px;
+}
+.stat-item{font-size:9px;color:var(--text2);}
+.stat-item span{color:var(--cyan);font-family:var(--font-main);}
+
+/* ===== ANIMATIONS ===== */
+@keyframes pulse-cyan{
+  0%,100%{box-shadow:0 0 0 rgba(0,229,255,0);}
+  50%{box-shadow:0 0 12px rgba(0,229,255,0.2);}
+}
+@keyframes blink{50%{opacity:0.3;}}
+@keyframes glow-pulse{
+  0%,100%{opacity:0.6;}50%{opacity:1;}
+}
+.pulse{animation:pulse-cyan 2s infinite;}
+.blink{animation:blink 1s infinite;}
+
+/* ===== RESPONSIVE ===== */
+@media(max-width:1200px){
+  .layout{grid-template-columns:200px 1fr 230px;gap:6px;padding:6px;}
+}
+</style>
+</head>
+<body>
+
+<div id="collapse-overlay"></div>
+
+<!-- ═══════════ TOPBAR ═══════════ -->
+<div class="topbar">
+  <div class="logo-wrap">
+    <div class="logo"><span>QUANTUM</span>SCOPE <span>//</span> QS-01</div>
+    <div class="logo-sub">INTERACTIVE QUANTUM STATE EVOLUTION LAB</div>
+  </div>
+  <div class="nav">
+    <span class="pill pill-cyan active" id="tab-circuit">CIRCUIT [F1]</span>
+    <span class="pill pill-cyan" id="tab-analysis">ANALYSIS [F2]</span>
+    <span class="pill pill-amber" id="challenge-toggle" onclick="toggleChallenge()">CHALLENGE [F3]</span>
+    <span class="pill pill-green" id="sys-status">ONLINE :: <span id="uptime">0s</span></span>
+    <span class="sys-clock" id="sys-clock">--:--:--</span>
+  </div>
+</div>
+
+<!-- ═══════════ MAIN LAYOUT ═══════════ -->
+<div class="layout">
+
+  <!-- ════ LEFT COLUMN ════ -->
+  <div class="col">
+
+    <!-- QUBIT STATE -->
+    <div class="panel" style="flex:0 0 auto;">
+      <div class="panel-head">
+        <span class="panel-title">QUBIT_STATE</span>
+        <span class="pill pill-green" style="font-size:7px;" id="state-badge">|0⟩ GROUND</span>
+      </div>
+      <div class="panel-body">
+        <div class="eq-box">
+          <div class="eq-main" id="eq-main">|ψ⟩ = 1.000·|0⟩ + 0.000·|1⟩</div>
+          <div class="eq-sub" id="eq-sub">GROUND STATE</div>
+        </div>
+
+        <div class="section-label">AMPLITUDES</div>
+        <div class="amp-grid">
+          <div class="amp-box">
+            <div class="amp-label">α (AMPLITUDE)</div>
+            <div class="amp-val" id="amp-alpha"><span class="re">1.000</span> + <span class="im">0.000</span>i</div>
+          </div>
+          <div class="amp-box">
+            <div class="amp-label">β (AMPLITUDE)</div>
+            <div class="amp-val" id="amp-beta"><span class="re">0.000</span> + <span class="im">0.000</span>i</div>
+          </div>
+        </div>
+
+        <div class="val-grid">
+          <div class="val-box">
+            <div class="val-label">P(|0⟩)</div>
+            <div class="val-num p0" id="val-p0">100.0%</div>
+          </div>
+          <div class="val-box">
+            <div class="val-label">P(|1⟩)</div>
+            <div class="val-num p1" id="val-p1">0.0%</div>
+          </div>
+          <div class="val-box">
+            <div class="val-label">θ (THETA)</div>
+            <div class="val-num alpha" id="val-theta">0.0°</div>
+          </div>
+          <div class="val-box">
+            <div class="val-label">φ (PHI)</div>
+            <div class="val-num beta" id="val-phi">0.0°</div>
+          </div>
+        </div>
+
+        <div class="section-label">NORMALIZATION</div>
+        <div class="norm-bar"><div class="norm-fill" id="norm-fill"></div></div>
+
+        <div class="btn-row">
+          <div class="qbtn measure" onclick="measure()">⚡ MEASURE</div>
+          <div class="qbtn reset" onclick="resetState()">⟳ RESET</div>
+        </div>
+        <div class="qbtn explain full" onclick="explainState()">EXPLAIN_STATE ↗</div>
+      </div>
+    </div>
+
+    <!-- GATE SEQUENCE -->
+    <div class="panel" style="flex:1 1 0;min-height:0;">
+      <div class="panel-head">
+        <span class="panel-title">GATE_SEQUENCE</span>
+        <span class="pill pill-cyan" style="font-size:7px;" id="gate-count">0 GATES</span>
+      </div>
+      <div class="panel-body">
+        <div class="circuit-wire" id="circuit-wire">
+          <span class="wire-init">|0⟩ —</span>
+          <span class="wire-end">— |ψ⟩</span>
+        </div>
+
+        <div class="section-label">QUANTUM GATES</div>
+        <div class="gates-grid">
+          <div class="gate H" data-tip="Hadamard — superposition" onclick="applyGate('H')">H</div>
+          <div class="gate X" data-tip="Pauli-X — bit flip" onclick="applyGate('X')">X</div>
+          <div class="gate Y" data-tip="Pauli-Y — bit+phase flip" onclick="applyGate('Y')">Y</div>
+          <div class="gate Z" data-tip="Pauli-Z — phase flip" onclick="applyGate('Z')">Z</div>
+          <div class="gate S" data-tip="S gate — π/2 phase" onclick="applyGate('S')">S</div>
+          <div class="gate T" data-tip="T gate — π/4 phase" onclick="applyGate('T')">T</div>
+          <div class="gate Rx" data-tip="Rx — X-axis rotation" onclick="showAngleInput('Rx')">Rx</div>
+          <div class="gate Ry" data-tip="Ry — Y-axis rotation" onclick="showAngleInput('Ry')">Ry</div>
+        </div>
+
+        <div class="angle-input-wrap" id="angle-wrap">
+          <label id="angle-label">Rx(θ):</label>
+          <input class="angle-input" id="angle-val" type="number" value="90" min="0" max="360" step="1"/>
+          <span style="font-size:8px;color:var(--text3);">°</span>
+          <div class="angle-apply" onclick="applyAngleGate()">APPLY</div>
+        </div>
+
+        <div class="divider"></div>
+        <div class="section-label">EXPERIMENT PRESETS</div>
+        <div class="presets-grid">
+          <div class="preset" onclick="loadPreset('superposition')">SUPERPOSITION</div>
+          <div class="preset" onclick="loadPreset('bitflip')">BIT_FLIP</div>
+          <div class="preset" onclick="loadPreset('phaseflip')">PHASE_FLIP</div>
+          <div class="preset bell" onclick="loadPreset('bell')">BELL STATE ★</div>
+        </div>
+
+        <div class="divider"></div>
+        <div class="section-label">STEP CONTROL</div>
+        <div class="btn-row">
+          <div class="qbtn" onclick="undoGate()">↩ UNDO</div>
+          <div class="qbtn" onclick="stepThrough()">▶ STEP</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ CENTER COLUMN ════ -->
+  <div class="col">
+    <div class="panel" style="flex:1 1 0;min-height:0;">
+      <div class="panel-head">
+        <span class="panel-title">BLOCH_SPHERE // THREE.JS</span>
+        <span class="pill pill-cyan" style="font-size:7px;">3D LIVE</span>
+      </div>
+      <div class="panel-body" style="padding:6px;display:flex;flex-direction:column;gap:6px;">
+
+        <!-- Bloch 3D -->
+        <div id="bloch-mount">
+          <canvas id="bloch-canvas"></canvas>
+          <div class="bloch-info">
+            <div class="bloch-stat">θ: <span id="bloch-theta">0.0°</span></div>
+            <div class="bloch-stat">φ: <span id="bloch-phi">0.0°</span></div>
+            <div class="bloch-stat">|ψ⟩: <span id="bloch-state">|0⟩</span></div>
+          </div>
+        </div>
+
+        <!-- Bell state dual spheres -->
+        <div class="bell-spheres" id="bell-spheres">
+          <div>
+            <div class="bell-label">QUBIT_A</div>
+            <div class="bell-sphere-mini" id="bell-sphere-a"></div>
+          </div>
+          <div>
+            <div class="bell-label">QUBIT_B (ENTANGLED)</div>
+            <div class="bell-sphere-mini" id="bell-sphere-b"></div>
+          </div>
+        </div>
+
+        <!-- Prob bars -->
+        <div class="prob-section">
+          <div class="section-label">MEASUREMENT PROBABILITY</div>
+          <div class="prob-bars">
+            <div class="prob-row">
+              <span class="prob-lbl">|0⟩</span>
+              <div class="prob-track"><div class="prob-fill-0" id="bar0" style="width:100%"></div></div>
+              <span class="prob-pct" id="pct0">100.0%</span>
+            </div>
+            <div class="prob-row">
+              <span class="prob-lbl">|1⟩</span>
+              <div class="prob-track"><div class="prob-fill-1" id="bar1" style="width:0%"></div></div>
+              <span class="prob-pct" id="pct1">0.0%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-ticker" id="stats-ticker">
+          <div class="stat-item">GATES: <span id="stat-gates">0</span></div>
+          <div class="stat-item">MEASURES: <span id="stat-measures">0</span></div>
+          <div class="stat-item">ENTROPY: <span id="stat-entropy">0.000</span></div>
+          <div class="stat-item">PURITY: <span id="stat-purity">1.000</span></div>
+        </div>
+
+        <!-- Bell info -->
+        <div id="bell-info">
+          <div class="exp-box" style="border-color:var(--purple2);background:var(--purple-dim);">
+            <div class="exp-lbl" style="color:var(--purple);">ENTANGLEMENT_STATE</div>
+            <span style="color:var(--purple);">|Φ⁺⟩ = (|00⟩ + |11⟩) / √2</span><br/>
+            <span style="color:var(--text2);font-size:9px;">Measuring qubit A instantly determines qubit B. Einstein called this "spooky action at a distance."</span>
+          </div>
+        </div>
+
+        <!-- Challenge -->
+        <div id="challenge-panel" style="display:none;">
+          <div class="challenge-box" id="challenge-content">
+            <div class="challenge-q" id="challenge-q">Loading challenge...</div>
+            <div class="challenge-opts" id="challenge-opts"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ RIGHT COLUMN ════ -->
+  <div class="col">
+
+    <!-- GATE PHYSICS -->
+    <div class="panel" style="flex:0 0 auto;">
+      <div class="panel-head">
+        <span class="panel-title">GATE_PHYSICS</span>
+        <span class="pill pill-cyan" style="font-size:7px;" id="gate-badge-r">IDENTITY</span>
+      </div>
+      <div class="panel-body">
+        <div class="matrix-box">
+          <div class="m-label">UNITARY MATRIX</div>
+          <div class="m-val" id="gate-matrix-text">I = [[1, 0], [0, 1]]</div>
+          <div class="matrix-visual" id="gate-matrix-vis">
+            <div class="mat-cell">1</div>
+            <div class="mat-cell">0</div>
+            <div class="mat-cell">0</div>
+            <div class="mat-cell">1</div>
+          </div>
+        </div>
+        <div class="exp-box">
+          <div class="exp-lbl">PHYSICAL_EFFECT</div>
+          <span id="gate-effect">Identity — qubit unchanged. Starting in ground state |0⟩.</span>
+        </div>
+        <div class="exp-box">
+          <div class="exp-lbl">BASIS_CHANGE</div>
+          <span id="gate-basis">No basis transformation. Computational basis preserved.</span>
+        </div>
+        <div class="matrix-box">
+          <div class="m-label">BLOCH_TRANSFORM</div>
+          <div class="m-val" id="gate-bloch-transform">θ: 0° | φ: 0° | no rotation</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI EXPLANATION -->
+    <div class="panel" style="flex:0 0 auto;">
+      <div class="panel-head">
+        <span class="panel-title">STATE_INTERPRETATION</span>
+        <span class="pill pill-green" style="font-size:7px;">AI ENGINE</span>
+      </div>
+      <div class="panel-body">
+        <div class="exp-box" id="ai-explain-box" style="color:var(--text2);min-height:40px;max-height:120px;overflow-y:auto;">
+          Click EXPLAIN_STATE for physics interpretation of the current qubit state.
+        </div>
+      </div>
+    </div>
+
+    <!-- SYS LOG -->
+    <div class="panel" style="flex:1 1 0;min-height:0;">
+      <div class="panel-head">
+        <span class="panel-title">SYS_LOG</span>
+        <span class="pill pill-green" style="font-size:7px;animation:glow-pulse 2s infinite;">LIVE</span>
+      </div>
+      <div class="panel-body" style="padding:6px 8px;">
+        <div class="syslog" id="syslog"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  QUANTUMSCOPE — COMPLETE QUANTUM STATE EVOLUTION ENGINE
+//  Problem 16: Quantum Visual Simulator
+//  Scientifically accurate single-qubit + Bell state simulation
+// ═══════════════════════════════════════════════════════════════
+
+// ═════════ COMPLEX NUMBER ENGINE ═════════
+class Complex {
+  constructor(re = 0, im = 0) {
+    this.re = re;
+    this.im = im;
+  }
+  static from(v) {
+    if (v instanceof Complex) return new Complex(v.re, v.im);
+    if (Array.isArray(v)) return new Complex(v[0] || 0, v[1] || 0);
+    return new Complex(v, 0);
+  }
+  add(b) { const o = Complex.from(b); return new Complex(this.re + o.re, this.im + o.im); }
+  sub(b) { const o = Complex.from(b); return new Complex(this.re - o.re, this.im - o.im); }
+  mul(b) {
+    const o = Complex.from(b);
+    return new Complex(this.re * o.re - this.im * o.im, this.re * o.im + this.im * o.re);
+  }
+  scale(s) { return new Complex(this.re * s, this.im * s); }
+  conj() { return new Complex(this.re, -this.im); }
+  abs() { return Math.sqrt(this.re * this.re + this.im * this.im); }
+  abs2() { return this.re * this.re + this.im * this.im; }
+  phase() { return Math.atan2(this.im, this.re); }
+  toString(dp = 3) {
+    const r = this.re.toFixed(dp), i = this.im.toFixed(dp);
+    if (Math.abs(this.im) < 1e-10) return r;
+    return r + (this.im >= 0 ? '+' : '') + i + 'i';
+  }
+  clone() { return new Complex(this.re, this.im); }
+}
+
+// ═════════ GATE DEFINITIONS ═════════
+const S2 = 1 / Math.sqrt(2);
+const GATE_DEFS = {
+  H: {
+    matrix: [[new Complex(S2), new Complex(S2)], [new Complex(S2), new Complex(-S2)]],
+    label: 'HADAMARD',
+    matStr: 'H = 1/√2 · [[1, 1], [1, -1]]',
+    matVis: ['1/√2', '1/√2', '1/√2', '-1/√2'],
+    effect: 'Rotates Bloch vector from Z-axis to X-axis. Creates equal superposition — qubit exists as both |0⟩ and |1⟩ simultaneously. P(0) = P(1) = 50%.',
+    basis: 'Transforms computational basis to Hadamard basis. |0⟩→|+⟩, |1⟩→|-⟩.',
+    bloch: 'θ: 0°→90° | 180° rotation about (X+Z)/√2 axis'
+  },
+  X: {
+    matrix: [[new Complex(0), new Complex(1)], [new Complex(1), new Complex(0)]],
+    label: 'PAULI-X (NOT)',
+    matStr: 'X = [[0, 1], [1, 0]]',
+    matVis: ['0', '1', '1', '0'],
+    effect: 'Bit flip. Rotates 180° around X-axis. Swaps |0⟩↔|1⟩. Classical NOT gate equivalent.',
+    basis: 'Eigenstates are |+⟩ and |-⟩. Flips computational basis.',
+    bloch: '180° rotation about X-axis | Pole swap'
+  },
+  Y: {
+    matrix: [[new Complex(0), new Complex(0, -1)], [new Complex(0, 1), new Complex(0)]],
+    label: 'PAULI-Y',
+    matStr: 'Y = [[0, -i], [i, 0]]',
+    matVis: ['0', '-i', 'i', '0'],
+    effect: 'Combined bit flip + phase flip. Rotates 180° around Y-axis. Introduces imaginary phase component.',
+    basis: 'Eigenstates are |+i⟩ and |-i⟩. Complex phase rotation.',
+    bloch: '180° rotation about Y-axis | Full complex flip'
+  },
+  Z: {
+    matrix: [[new Complex(1), new Complex(0)], [new Complex(0), new Complex(-1)]],
+    label: 'PAULI-Z',
+    matStr: 'Z = [[1, 0], [0, -1]]',
+    matVis: ['1', '0', '0', '-1'],
+    effect: 'Phase flip. Flips phase of |1⟩ component by π. No effect on measurement probabilities — only relative phase changes.',
+    basis: 'Eigenstates are |0⟩ and |1⟩. Computational basis preserved, phase inverted.',
+    bloch: '180° rotation about Z-axis | Phase only'
+  },
+  S: {
+    matrix: [[new Complex(1), new Complex(0)], [new Complex(0), new Complex(0, 1)]],
+    label: 'S GATE (√Z)',
+    matStr: 'S = [[1, 0], [0, i]]',
+    matVis: ['1', '0', '0', 'i'],
+    effect: 'π/2 phase rotation. Adds 90° phase to |1⟩ component. S² = Z. Used in phase kickback.',
+    basis: 'Quarter-turn in phase space. Important for T-gate decomposition.',
+    bloch: '+90° rotation about Z-axis | S²=Z'
+  },
+  T: {
+    matrix: [[new Complex(1), new Complex(0)], [new Complex(0), new Complex(Math.cos(Math.PI/4), Math.sin(Math.PI/4))]],
+    label: 'T GATE (⁴√Z)',
+    matStr: 'T = [[1, 0], [0, e^(iπ/4)]]',
+    matVis: ['1', '0', '0', 'e^iπ/4'],
+    effect: 'π/4 phase rotation. Smallest standard phase gate. T⁴=Z. Essential for universal quantum computation and fault-tolerant computing.',
+    basis: 'Eighth-turn in phase. Combined with H for universal gate set.',
+    bloch: '+45° rotation about Z-axis | T²=S | T⁴=Z'
+  }
+};
+
+// Generate Rx(θ) and Ry(θ) gates dynamically
+function makeRx(angleDeg) {
+  const t = (angleDeg * Math.PI / 180) / 2;
+  return {
+    matrix: [
+      [new Complex(Math.cos(t)), new Complex(0, -Math.sin(t))],
+      [new Complex(0, -Math.sin(t)), new Complex(Math.cos(t))]
+    ],
+    label: `Rx(${angleDeg}°)`,
+    matStr: `Rx(${angleDeg}°) = [[cos(θ/2), -i·sin(θ/2)], [-i·sin(θ/2), cos(θ/2)]]`,
+    matVis: [Math.cos(t).toFixed(3), (-Math.sin(t)).toFixed(3)+'i', (-Math.sin(t)).toFixed(3)+'i', Math.cos(t).toFixed(3)],
+    effect: `Rotates ${angleDeg}° around X-axis. Continuous rotation enabling arbitrary qubit manipulation on Bloch sphere.`,
+    basis: `X-axis rotation by ${angleDeg}°. Partial bit-flip operation.`,
+    bloch: `${angleDeg}° rotation about X-axis`
+  };
+}
+function makeRy(angleDeg) {
+  const t = (angleDeg * Math.PI / 180) / 2;
+  return {
+    matrix: [
+      [new Complex(Math.cos(t)), new Complex(-Math.sin(t))],
+      [new Complex(Math.sin(t)), new Complex(Math.cos(t))]
+    ],
+    label: `Ry(${angleDeg}°)`,
+    matStr: `Ry(${angleDeg}°) = [[cos(θ/2), -sin(θ/2)], [sin(θ/2), cos(θ/2)]]`,
+    matVis: [Math.cos(t).toFixed(3), (-Math.sin(t)).toFixed(3), Math.sin(t).toFixed(3), Math.cos(t).toFixed(3)],
+    effect: `Rotates ${angleDeg}° around Y-axis. Real-valued rotation preserving phase relationships.`,
+    basis: `Y-axis rotation by ${angleDeg}°. Creates amplitude mixing.`,
+    bloch: `${angleDeg}° rotation about Y-axis`
+  };
+}
+
+// ═════════ MASTER QUBIT STATE ═════════
+const QState = {
+  alpha: new Complex(1, 0),
+  beta: new Complex(0, 0),
+  gateHistory: [],
+  stepQueue: [],
+  measured: false,
+  collapsedTo: null,
+  bellMode: false,
+  gatesApplied: 0,
+  measureCount: 0,
+
+  get p0() { return this.alpha.abs2(); },
+  get p1() { return this.beta.abs2(); },
+  get theta() { return 2 * Math.acos(Math.min(1, Math.max(0, Math.sqrt(this.p0)))); },
+  get phi() { return Math.atan2(this.beta.im, this.beta.re) - Math.atan2(this.alpha.im, this.alpha.re); },
+  get blochX() {
+    const c = this.alpha.conj().mul(this.beta);
+    return 2 * c.re;
+  },
+  get blochY() {
+    const c = this.alpha.conj().mul(this.beta);
+    return 2 * c.im;
+  },
+  get blochZ() { return this.p0 - this.p1; },
+  get entropy() {
+    const p = this.p0;
+    if (p < 1e-10 || p > 1 - 1e-10) return 0;
+    return -(p * Math.log2(p) + (1-p) * Math.log2(1-p));
+  },
+  get norm() { return Math.sqrt(this.p0 + this.p1); },
+
+  applyMatrix(gate) {
+    const m = gate.matrix;
+    const a = this.alpha.clone(), b = this.beta.clone();
+    this.alpha = m[0][0].mul(a).add(m[0][1].mul(b));
+    this.beta  = m[1][0].mul(a).add(m[1][1].mul(b));
+    this.normalize();
+  },
+
+  normalize() {
+    const n = this.norm;
+    if (n > 1e-10) {
+      this.alpha = this.alpha.scale(1/n);
+      this.beta  = this.beta.scale(1/n);
+    }
+  },
+
+  reset() {
+    this.alpha = new Complex(1, 0);
+    this.beta = new Complex(0, 0);
+    this.gateHistory = [];
+    this.stepQueue = [];
+    this.measured = false;
+    this.collapsedTo = null;
+    this.bellMode = false;
+  }
+};
+
+// ═════════ UI UPDATE ENGINE ═════════
+let lastGateDef = null;
+
+function updateAllUI() {
+  // State equation
+  const eq = document.getElementById('eq-main');
+  const aStr = QState.alpha.toString(3);
+  const bStr = QState.beta.toString(3);
+  eq.textContent = `|ψ⟩ = (${aStr})·|0⟩ + (${bStr})·|1⟩`;
+
+  // Amplitudes
+  document.getElementById('amp-alpha').innerHTML =
+    `<span class="re">${QState.alpha.re.toFixed(3)}</span> + <span class="im">${QState.alpha.im.toFixed(3)}</span>i`;
+  document.getElementById('amp-beta').innerHTML =
+    `<span class="re">${QState.beta.re.toFixed(3)}</span> + <span class="im">${QState.beta.im.toFixed(3)}</span>i`;
+
+  // Probabilities
+  const p0 = QState.p0 * 100, p1 = QState.p1 * 100;
+  document.getElementById('val-p0').textContent = p0.toFixed(1) + '%';
+  document.getElementById('val-p1').textContent = p1.toFixed(1) + '%';
+  document.getElementById('bar0').style.width = p0.toFixed(1) + '%';
+  document.getElementById('bar1').style.width = p1.toFixed(1) + '%';
+  document.getElementById('pct0').textContent = p0.toFixed(1) + '%';
+  document.getElementById('pct1').textContent = p1.toFixed(1) + '%';
+
+  // Bloch angles
+  const thetaDeg = (QState.theta * 180 / Math.PI).toFixed(1);
+  const phiDeg = (QState.phi * 180 / Math.PI).toFixed(1);
+  document.getElementById('val-theta').textContent = thetaDeg + '°';
+  document.getElementById('val-phi').textContent = phiDeg + '°';
+  document.getElementById('bloch-theta').textContent = thetaDeg + '°';
+  document.getElementById('bloch-phi').textContent = phiDeg + '°';
+
+  // State label
+  let stateLabel = '', stateBadge = '';
+  if (QState.measured) {
+    stateLabel = 'COLLAPSED → |' + QState.collapsedTo + '⟩';
+    stateBadge = 'COLLAPSED |' + QState.collapsedTo + '⟩';
+  } else if (p0 > 99.9) {
+    stateLabel = 'GROUND STATE';
+    stateBadge = '|0⟩ GROUND';
+  } else if (p1 > 99.9) {
+    stateLabel = 'EXCITED STATE';
+    stateBadge = '|1⟩ EXCITED';
+  } else if (Math.abs(p0 - 50) < 0.5) {
+    stateLabel = 'EQUAL SUPERPOSITION';
+    stateBadge = '|+⟩ SUPER';
+  } else {
+    stateLabel = 'SUPERPOSITION STATE';
+    stateBadge = '|ψ⟩ SUPER';
+  }
+  document.getElementById('eq-sub').textContent = stateLabel;
+  document.getElementById('state-badge').textContent = stateBadge;
+
+  // Bloch state mini label
+  const bState = document.getElementById('bloch-state');
+  if (p0 > 99.9) bState.textContent = '|0⟩';
+  else if (p1 > 99.9) bState.textContent = '|1⟩';
+  else bState.textContent = '|ψ⟩';
+
+  // Normalization
+  const normFill = document.getElementById('norm-fill');
+  const normVal = QState.norm;
+  normFill.style.width = (normVal * 100).toFixed(1) + '%';
+  normFill.className = 'norm-fill' + (normVal > 0.999 ? '' : normVal > 0.95 ? ' warn' : ' err');
+
+  // Stats
+  document.getElementById('stat-gates').textContent = QState.gatesApplied;
+  document.getElementById('stat-measures').textContent = QState.measureCount;
+  document.getElementById('stat-entropy').textContent = QState.entropy.toFixed(3);
+  document.getElementById('stat-purity').textContent = (1).toFixed(3); // pure state
+  document.getElementById('gate-count').textContent = QState.gateHistory.length + ' GATES';
+
+  // Animate Bloch sphere
+  animateBlochTarget();
+}
+
+function updateGatePhysics(gateDef) {
+  if (!gateDef) return;
+  lastGateDef = gateDef;
+  document.getElementById('gate-badge-r').textContent = gateDef.label;
+  document.getElementById('gate-matrix-text').textContent = gateDef.matStr;
+  document.getElementById('gate-effect').textContent = gateDef.effect;
+  document.getElementById('gate-basis').textContent = gateDef.basis;
+  document.getElementById('gate-bloch-transform').textContent = gateDef.bloch;
+
+  // Matrix visual
+  const vis = document.getElementById('gate-matrix-vis');
+  vis.innerHTML = '';
+  (gateDef.matVis || ['1','0','0','1']).forEach(v => {
+    const cell = document.createElement('div');
+    cell.className = 'mat-cell';
+    cell.textContent = v;
+    vis.appendChild(cell);
+  });
+}
+
+function updateCircuit() {
+  const wire = document.getElementById('circuit-wire');
+  wire.innerHTML = '<span class="wire-init">|0⟩ —</span>';
+  QState.gateHistory.forEach(g => {
+    const chip = document.createElement('span');
+    chip.className = 'gate-chip ' + g + '-chip';
+    chip.textContent = g;
+    wire.appendChild(chip);
+  });
+  const end = document.createElement('span');
+  end.className = 'wire-end';
+  end.textContent = '— |ψ⟩';
+  wire.appendChild(end);
+}
+
+// ═════════ GATE APPLICATION ═════════
+function applyGate(gateName) {
+  if (QState.measured) { resetState(); }
+  QState.bellMode = false;
+  document.getElementById('bell-info').style.display = 'none';
+  document.getElementById('bell-spheres').classList.remove('active');
+
+  const gate = GATE_DEFS[gateName];
+  if (!gate) return;
+
+  QState.applyMatrix(gate);
+  QState.gateHistory.push(gateName);
+  QState.gatesApplied++;
+
+  updateAllUI();
+  updateGatePhysics(gate);
+  updateCircuit();
+
+  addLog('GATE_APPLIED: ' + gateName, 'warn');
+  addLog(`α=${QState.alpha.toString(3)}  β=${QState.beta.toString(3)}`, 'info');
+  addLog(`θ=${(QState.theta*180/Math.PI).toFixed(1)}° φ=${(QState.phi*180/Math.PI).toFixed(1)}°`, 'info');
+
+  // Flash gate effect
+  flashOverlay('cyan');
+}
+
+let pendingAngleGate = 'Rx';
+function showAngleInput(type) {
+  pendingAngleGate = type;
+  document.getElementById('angle-wrap').classList.add('show');
+  document.getElementById('angle-label').textContent = type + '(θ):';
+  document.getElementById('angle-val').focus();
+}
+
+function applyAngleGate() {
+  const deg = parseFloat(document.getElementById('angle-val').value) || 90;
+  const gate = pendingAngleGate === 'Rx' ? makeRx(deg) : makeRy(deg);
+  document.getElementById('angle-wrap').classList.remove('show');
+
+  if (QState.measured) { resetState(); }
+  QState.bellMode = false;
+  document.getElementById('bell-info').style.display = 'none';
+  document.getElementById('bell-spheres').classList.remove('active');
+
+  QState.applyMatrix(gate);
+  QState.gateHistory.push(gate.label);
+  QState.gatesApplied++;
+
+  updateAllUI();
+  updateGatePhysics(gate);
+  updateCircuit();
+  addLog('GATE_APPLIED: ' + gate.label, 'warn');
+  addLog(`α=${QState.alpha.toString(3)}  β=${QState.beta.toString(3)}`, 'info');
+  flashOverlay('cyan');
+}
+
+// ═════════ MEASUREMENT ═════════
+function measure() {
+  if (QState.measured) return;
+
+  const p0 = QState.p0;
+  const rand = Math.random();
+  const result = rand < p0 ? 0 : 1;
+
+  // Flash & vibrate
+  flashOverlay('red');
+  vibrateBloch(() => {
+    // Collapse
+    QState.alpha = result === 0 ? new Complex(1, 0) : new Complex(0, 0);
+    QState.beta  = result === 0 ? new Complex(0, 0) : new Complex(1, 0);
+    QState.measured = true;
+    QState.collapsedTo = result;
+    QState.measureCount++;
+
+    updateAllUI();
+    addLog('MEASUREMENT_COLLAPSED → |' + result + '⟩', 'err');
+    addLog('RAND=' + rand.toFixed(4) + ' THRESHOLD=' + p0.toFixed(4), 'sys');
+    addLog('WAVEFUNCTION_DESTROYED', 'err');
+
+    // Challenge
+    if (challengeActive && currentChallenge) {
+      revealChallenge(result);
+    }
+  });
+}
+
+function flashOverlay(color) {
+  const o = document.getElementById('collapse-overlay');
+  if (color === 'red') {
+    o.style.background = 'radial-gradient(circle at center,rgba(255,23,68,0.1),rgba(255,23,68,0.02))';
+  } else {
+    o.style.background = 'radial-gradient(circle at center,rgba(0,229,255,0.06),transparent)';
+  }
+  o.style.opacity = '1';
+  setTimeout(() => { o.style.opacity = '0'; }, 400);
+}
+
+// ═════════ RESET ═════════
+function resetState() {
+  QState.reset();
+  document.getElementById('bell-info').style.display = 'none';
+  document.getElementById('bell-spheres').classList.remove('active');
+  document.getElementById('angle-wrap').classList.remove('show');
+  trailPoints = [];
+
+  updateAllUI();
+  updateCircuit();
+  updateGatePhysics({
+    label: 'IDENTITY', matStr: 'I = [[1, 0], [0, 1]]',
+    matVis: ['1','0','0','1'],
+    effect: 'Identity — qubit unchanged. Starting in ground state |0⟩.',
+    basis: 'No basis transformation. Computational basis preserved.',
+    bloch: 'θ: 0° | φ: 0° | no rotation'
+  });
+  addLog('SYSTEM_RESET → |0⟩', 'ok');
+}
+
+// ═════════ UNDO ═════════
+function undoGate() {
+  if (QState.gateHistory.length === 0) return;
+  const removed = QState.gateHistory.pop();
+  // Replay all gates from scratch
+  QState.alpha = new Complex(1, 0);
+  QState.beta = new Complex(0, 0);
+  QState.measured = false;
+  QState.bellMode = false;
+  trailPoints = [];
+
+  QState.gateHistory.forEach(g => {
+    const gate = GATE_DEFS[g];
+    if (gate) QState.applyMatrix(gate);
+  });
+
+  updateAllUI();
+  updateCircuit();
+  addLog('UNDO: Removed ' + removed, 'warn');
+}
+
+// ═════════ STEP THROUGH ═════════
+function stepThrough() {
+  if (QState.stepQueue.length === 0) {
+    addLog('STEP_QUEUE_EMPTY — add gates first', 'warn');
+    return;
+  }
+  const next = QState.stepQueue.shift();
+  applyGate(next);
+  addLog('STEP_EXECUTE: ' + next + ' (' + QState.stepQueue.length + ' remaining)', 'sys');
+}
+
+// ═════════ PRESETS ═════════
+function loadPreset(name) {
+  resetState();
+
+  if (name === 'superposition') {
+    applyGate('H');
+    addLog('PRESET_LOADED: EQUAL SUPERPOSITION', 'ok');
+  } else if (name === 'bitflip') {
+    applyGate('X');
+    addLog('PRESET_LOADED: BIT_FLIP → |1⟩', 'ok');
+  } else if (name === 'phaseflip') {
+    applyGate('H');
+    applyGate('Z');
+    addLog('PRESET_LOADED: PHASE_FLIP → |-⟩', 'ok');
+  } else if (name === 'bell') {
+    QState.bellMode = true;
+    applyGate('H');
+    QState.gateHistory.push('CNOT');
+    updateCircuit();
+    document.getElementById('bell-info').style.display = 'block';
+    document.getElementById('bell-spheres').classList.add('active');
+
+    updateGatePhysics({
+      label: 'BELL STATE |Φ⁺⟩',
+      matStr: 'CNOT·(H⊗I)|00⟩ = (|00⟩+|11⟩)/√2',
+      matVis: ['1','0','0','0','0','1','0','0','0','0','0','1','0','0','1','0'],
+      effect: 'Entangled Bell state |Φ⁺⟩. After H+CNOT: qubits become maximally entangled. Measuring one instantly determines the other — nonlocal quantum correlation.',
+      basis: 'Bell basis. Computational basis no longer applicable to individual qubits.',
+      bloch: 'Two-qubit entanglement | Max correlation | Reduced density matrix = I/2'
+    });
+
+    initBellSpheres();
+    addLog('PRESET_LOADED: BELL STATE |Φ⁺⟩', 'sys');
+    addLog('ENTANGLEMENT_ESTABLISHED — max correlation', 'ok');
+  }
+}
+
+// ═════════ THREE.JS BLOCH SPHERE ═════════
+let renderer, scene, camera, stateMesh, trailLine;
+let trailPoints = [];
+const TRAIL_MAX = 60;
+let currentTheta = 0, currentPhi = 0;
+let targetTheta = 0, targetPhi = 0;
+let cameraAngle = 0;
+let isVibrating = false;
+
+function initThreeJS() {
+  const mount = document.getElementById('bloch-mount');
+  const canvas = document.getElementById('bloch-canvas');
+  const w = mount.clientWidth, h = mount.clientHeight;
+
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setSize(w, h);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setClearColor(0x000000, 0);
+
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(40, w / h, 0.1, 100);
+  camera.position.set(2.5, 1.6, 2.5);
+  camera.lookAt(0, 0, 0);
+
+  // Translucent sphere shell
+  const sphereGeo = new THREE.SphereGeometry(1, 64, 64);
+  const sphereMat = new THREE.MeshPhongMaterial({
+    color: 0x002233, transparent: true, opacity: 0.12,
+    side: THREE.DoubleSide, shininess: 30
+  });
+  scene.add(new THREE.Mesh(sphereGeo, sphereMat));
+
+  // Wireframe shell
+  const wireGeo = new THREE.SphereGeometry(1, 20, 20);
+  const wireMat = new THREE.MeshBasicMaterial({
+    color: 0x102030, wireframe: true, transparent: true, opacity: 0.12
+  });
+  scene.add(new THREE.Mesh(wireGeo, wireMat));
+
+  // Latitude rings: equator, ±30°, ±60°
+  const latAngles = [0, Math.PI/6, -Math.PI/6, Math.PI/3, -Math.PI/3];
+  latAngles.forEach((lat, i) => {
+    const r = Math.cos(lat);
+    const y = Math.sin(lat);
+    const geo = new THREE.TorusGeometry(r, i === 0 ? 0.006 : 0.003, 8, 80);
+    const color = i === 0 ? 0x00e5ff : 0x003344;
+    const opacity = i === 0 ? 0.35 : 0.08;
+    const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity });
+    const torus = new THREE.Mesh(geo, mat);
+    torus.position.y = y;
+    scene.add(torus);
+  });
+
+  // Meridian rings
+  [0, Math.PI / 4, Math.PI / 2, 3 * Math.PI / 4].forEach(angle => {
+    const geo = new THREE.TorusGeometry(1, 0.003, 8, 80);
+    const mat = new THREE.MeshBasicMaterial({ color: 0x002233, transparent: true, opacity: 0.1 });
+    const torus = new THREE.Mesh(geo, mat);
+    torus.rotation.y = angle;
+    torus.rotation.x = Math.PI / 2;
+    scene.add(torus);
+  });
+
+  // Axes with glow
+  const axDefs = [
+    { dir: [1, 0, 0], color: 0xff1744, len: 1.25 },
+    { dir: [-1, 0, 0], color: 0x440011, len: 1.25 },
+    { dir: [0, 1, 0], color: 0x00e676, len: 1.25 },
+    { dir: [0, -1, 0], color: 0x003311, len: 1.25 },
+    { dir: [0, 0, 1], color: 0x00e5ff, len: 1.25 },
+    { dir: [0, 0, -1], color: 0x002233, len: 1.25 }
+  ];
+  axDefs.forEach(a => {
+    const pts = [new THREE.Vector3(0,0,0), new THREE.Vector3(...a.dir).multiplyScalar(a.len)];
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    const mat = new THREE.LineBasicMaterial({ color: a.color, transparent: true, opacity: 0.5 });
+    scene.add(new THREE.Line(geo, mat));
+  });
+
+  // Labels
+  makeLabel('|0⟩', 0, 1.55, 0, '#00e5ff', 28);
+  makeLabel('|1⟩', 0, -1.55, 0, '#556666', 28);
+  makeLabel('+X', 1.4, 0, 0, '#ff1744', 22);
+  makeLabel('-X', -1.4, 0, 0, '#442222', 18);
+  makeLabel('+Y', 0, 0, 1.4, '#00e676', 22);
+  makeLabel('+Z', 0.15, 1.35, 0, '#006688', 18);
+
+  // North/South pole dots
+  const poleGeo = new THREE.SphereGeometry(0.04, 8, 8);
+  const poleN = new THREE.Mesh(poleGeo, new THREE.MeshBasicMaterial({ color: 0x00e5ff }));
+  poleN.position.set(0, 1, 0);
+  scene.add(poleN);
+  const poleS = new THREE.Mesh(poleGeo.clone(), new THREE.MeshBasicMaterial({ color: 0x444444 }));
+  poleS.position.set(0, -1, 0);
+  scene.add(poleS);
+
+  // State vector arrow group
+  const arrowGroup = new THREE.Group();
+
+  // Shaft
+  const shaftGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.82, 12);
+  const shaftMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff });
+  const shaft = new THREE.Mesh(shaftGeo, shaftMat);
+  shaft.position.y = 0.41;
+  arrowGroup.add(shaft);
+
+  // Arrowhead cone
+  const headGeo = new THREE.ConeGeometry(0.06, 0.18, 12);
+  const headMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff });
+  const head = new THREE.Mesh(headGeo, headMat);
+  head.position.y = 0.91;
+  arrowGroup.add(head);
+
+  // Glowing tip sphere
+  const tipGeo = new THREE.SphereGeometry(0.055, 12, 12);
+  const tipMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
+  const tip = new THREE.Mesh(tipGeo, tipMat);
+  tip.position.y = 1.0;
+  arrowGroup.add(tip);
+
+  // Outer glow sphere
+  const glowGeo = new THREE.SphereGeometry(0.12, 12, 12);
+  const glowMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.15 });
+  const glow = new THREE.Mesh(glowGeo, glowMat);
+  glow.position.y = 1.0;
+  arrowGroup.add(glow);
+
+  stateMesh = arrowGroup;
+  scene.add(stateMesh);
+
+  // Trail line
+  const trailGeo = new THREE.BufferGeometry();
+  const trailMat = new THREE.LineBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.25 });
+  trailLine = new THREE.Line(trailGeo, trailMat);
+  scene.add(trailLine);
+
+  // Lighting
+  scene.add(new THREE.AmbientLight(0xffffff, 0.25));
+  const ptLight = new THREE.PointLight(0x00e5ff, 0.6, 10);
+  ptLight.position.set(3, 4, 3);
+  scene.add(ptLight);
+  const ptLight2 = new THREE.PointLight(0xff1744, 0.2, 8);
+  ptLight2.position.set(-2, -1, -2);
+  scene.add(ptLight2);
+
+  // Render loop
+  function renderLoop() {
+    requestAnimationFrame(renderLoop);
+    cameraAngle += 0.003;
+    camera.position.x = Math.cos(cameraAngle) * 3.0;
+    camera.position.z = Math.sin(cameraAngle) * 3.0;
+    camera.position.y = 1.2 + Math.sin(cameraAngle * 0.5) * 0.3;
+    camera.lookAt(0, 0, 0);
+
+    // Smooth interpolation
+    if (!isVibrating) {
+      currentTheta += (targetTheta - currentTheta) * 0.06;
+      currentPhi   += (targetPhi   - currentPhi) * 0.06;
+    }
+    updateArrowOrientation(currentTheta, currentPhi);
+
+    renderer.render(scene, camera);
+  }
+  renderLoop();
+}
+
+function makeLabel(text, x, y, z, color, fontSize) {
+  const c = document.createElement('canvas');
+  c.width = 160; c.height = 80;
+  const ctx = c.getContext('2d');
+  ctx.font = `bold ${fontSize}px monospace`;
+  ctx.fillStyle = color;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 80, 40);
+  const tex = new THREE.CanvasTexture(c);
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true });
+  const sprite = new THREE.Sprite(mat);
+  sprite.position.set(x, y, z);
+  sprite.scale.set(0.5, 0.25, 1);
+  scene.add(sprite);
+}
+
+function updateArrowOrientation(theta, phi) {
+  const x = Math.sin(theta) * Math.cos(phi);
+  const z = Math.sin(theta) * Math.sin(phi);
+  const y = Math.cos(theta);
+  const dir = new THREE.Vector3(x, y, z).normalize();
+  const up = new THREE.Vector3(0, 1, 0);
+  const quat = new THREE.Quaternion().setFromUnitVectors(up, dir);
+  stateMesh.setRotationFromQuaternion(quat);
+
+  // Trail
+  const tip = new THREE.Vector3(x, y, z);
+  if (trailPoints.length === 0 || trailPoints[trailPoints.length-1].distanceTo(tip) > 0.01) {
+    trailPoints.push(tip);
+    if (trailPoints.length > TRAIL_MAX) trailPoints.shift();
+    trailLine.geometry.dispose();
+    trailLine.geometry = new THREE.BufferGeometry().setFromPoints(trailPoints);
+  }
+}
+
+function animateBlochTarget() {
+  targetTheta = QState.theta;
+  targetPhi = QState.phi;
+}
+
+function vibrateBloch(cb) {
+  isVibrating = true;
+  let t = 0;
+  const origT = targetTheta, origP = targetPhi;
+  const interval = setInterval(() => {
+    t++;
+    const intensity = (1 - t / 15) * 0.4;
+    currentTheta = origT + (Math.random() - 0.5) * intensity;
+    currentPhi = origP + (Math.random() - 0.5) * intensity;
+    if (t > 15) {
+      clearInterval(interval);
+      isVibrating = false;
+      cb();
+    }
+  }, 35);
+}
+
+// ═════════ BELL STATE MINI SPHERES ═════════
+let bellRendererA, bellRendererB, bellSceneA, bellSceneB, bellCamA, bellCamB;
+let bellArrowA, bellArrowB;
+
+function initBellSpheres() {
+  if (bellRendererA) return; // already initialized
+  ['a', 'b'].forEach(id => {
+    const mount = document.getElementById('bell-sphere-' + id);
+    const w = mount.clientWidth || 120, h = mount.clientHeight || 120;
+    const r = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    r.setSize(w, h);
+    r.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    r.setClearColor(0x000000, 0);
+    mount.appendChild(r.domElement);
+
+    const s = new THREE.Scene();
+    const c = new THREE.PerspectiveCamera(35, w / h, 0.1, 50);
+    c.position.set(2, 1.5, 2);
+    c.lookAt(0, 0, 0);
+
+    // Mini sphere
+    const sg = new THREE.SphereGeometry(0.8, 24, 24);
+    const sm = new THREE.MeshBasicMaterial({ color: 0x001122, wireframe: true, transparent: true, opacity: 0.2 });
+    s.add(new THREE.Mesh(sg, sm));
+
+    // Equator
+    const tg = new THREE.TorusGeometry(0.8, 0.005, 6, 48);
+    const tm = new THREE.MeshBasicMaterial({ color: 0x7c4dff, transparent: true, opacity: 0.3 });
+    s.add(new THREE.Mesh(tg, tm));
+
+    // Arrow
+    const ag = new THREE.Group();
+    const shaft = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.02, 0.02, 0.6, 8),
+      new THREE.MeshBasicMaterial({ color: id === 'a' ? 0x00e5ff : 0xb388ff })
+    );
+    shaft.position.y = 0.3;
+    ag.add(shaft);
+    const cone = new THREE.Mesh(
+      new THREE.ConeGeometry(0.05, 0.15, 8),
+      new THREE.MeshBasicMaterial({ color: id === 'a' ? 0x00e5ff : 0xb388ff })
+    );
+    cone.position.y = 0.68;
+    ag.add(cone);
+    s.add(ag);
+
+    s.add(new THREE.AmbientLight(0xffffff, 0.3));
+
+    if (id === 'a') {
+      bellRendererA = r; bellSceneA = s; bellCamA = c; bellArrowA = ag;
+    } else {
+      bellRendererB = r; bellSceneB = s; bellCamB = c; bellArrowB = ag;
+    }
+  });
+
+  // Animate bell spheres
+  let bellAngle = 0;
+  function animBell() {
+    requestAnimationFrame(animBell);
+    bellAngle += 0.01;
+
+    if (bellArrowA && bellArrowB) {
+      // Both point up (|0⟩) in superposition
+      const up = new THREE.Vector3(0, 1, 0);
+      const qA = new THREE.Quaternion().setFromUnitVectors(up, up);
+      bellArrowA.setRotationFromQuaternion(qA);
+
+      // Mirror: B follows A
+      const bobble = Math.sin(bellAngle * 2) * 0.15;
+      const dirA = new THREE.Vector3(Math.sin(bobble), Math.cos(bobble), 0).normalize();
+      const qA2 = new THREE.Quaternion().setFromUnitVectors(up, dirA);
+      bellArrowA.setRotationFromQuaternion(qA2);
+      bellArrowB.setRotationFromQuaternion(qA2);
+
+      bellCamA.position.x = Math.cos(bellAngle * 0.5) * 2.5;
+      bellCamA.position.z = Math.sin(bellAngle * 0.5) * 2.5;
+      bellCamA.lookAt(0, 0, 0);
+      bellCamB.position.x = Math.cos(bellAngle * 0.5 + Math.PI) * 2.5;
+      bellCamB.position.z = Math.sin(bellAngle * 0.5 + Math.PI) * 2.5;
+      bellCamB.lookAt(0, 0, 0);
+    }
+
+    if (bellRendererA) bellRendererA.render(bellSceneA, bellCamA);
+    if (bellRendererB) bellRendererB.render(bellSceneB, bellCamB);
+  }
+  animBell();
+}
+
+// ═════════ SYS LOG ═════════
+function addLog(msg, type) {
+  const el = document.getElementById('syslog');
+  const now = new Date();
+  const ts = '[' + pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds()) + ']';
+  const line = document.createElement('div');
+  line.className = 'log-line';
+  line.innerHTML = `<span class="log-time">${ts}</span><span class="log-${type}">› ${msg}</span>`;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+
+  // Keep max 100 lines
+  while (el.children.length > 100) el.removeChild(el.firstChild);
+}
+
+function pad(n) { return String(n).padStart(2, '0'); }
+
+// ═════════ AI EXPLAIN ENGINE ═════════
+function explainState() {
+  const box = document.getElementById('ai-explain-box');
+
+  // Generate structured local explanation (no external API needed)
+  const p0 = QState.p0, p1 = QState.p1;
+  const thetaDeg = (QState.theta * 180 / Math.PI).toFixed(1);
+  const phiDeg = (QState.phi * 180 / Math.PI).toFixed(1);
+  const gates = QState.gateHistory.join(' → ') || 'None';
+
+  let basis, physics, measurement;
+
+  if (QState.measured) {
+    basis = `Collapsed state |${QState.collapsedTo}⟩ — no superposition remains.`;
+    physics = `Measurement destroyed the wavefunction. Qubit is now in a definite classical state.`;
+    measurement = `Will always yield |${QState.collapsedTo}⟩ with 100% certainty until reset.`;
+  } else if (p0 > 0.999) {
+    basis = `Ground state |0⟩ — qubit at north pole of Bloch sphere.`;
+    physics = gates === 'None'
+      ? `No gates applied. Qubit initialized in computational basis ground state.`
+      : `Gate sequence ${gates} returned qubit to |0⟩ eigenstate.`;
+    measurement = `Will collapse to |0⟩ with 100% certainty. No quantum randomness.`;
+  } else if (p1 > 0.999) {
+    basis = `Excited state |1⟩ — qubit at south pole of Bloch sphere.`;
+    physics = `Gate sequence ${gates} flipped qubit to excited state. Bloch vector points down.`;
+    measurement = `Will collapse to |1⟩ with 100% certainty.`;
+  } else if (Math.abs(p0 - 0.5) < 0.01) {
+    basis = `Equal superposition — qubit exists as both |0⟩ and |1⟩ simultaneously.`;
+    physics = `Gate sequence ${gates} created maximum superposition. Bloch vector lies on equator at θ=${thetaDeg}°, φ=${phiDeg}°.`;
+    measurement = `Will randomly collapse to |0⟩ or |1⟩ with equal 50% probability.`;
+  } else {
+    basis = `Asymmetric superposition — weighted toward |${p0 > p1 ? '0' : '1'}⟩.`;
+    physics = `Gate sequence ${gates} created partial superposition. θ=${thetaDeg}° indicates tilt from Z-axis. Phase φ=${phiDeg}°.`;
+    measurement = `P(|0⟩)=${(p0*100).toFixed(1)}%, P(|1⟩)=${(p1*100).toFixed(1)}%. Quantum randomness active.`;
+  }
+
+  box.innerHTML = `<div style="margin-bottom:4px;"><span style="color:var(--cyan);font-size:8px;letter-spacing:2px;font-family:var(--font-main);">BASIS</span><br/>${basis}</div>`
+    + `<div style="margin-bottom:4px;"><span style="color:var(--green);font-size:8px;letter-spacing:2px;font-family:var(--font-main);">PHYSICS</span><br/>${physics}</div>`
+    + `<div><span style="color:var(--amber);font-size:8px;letter-spacing:2px;font-family:var(--font-main);">MEASUREMENT</span><br/>${measurement}</div>`;
+
+  addLog('STATE_EXPLAINED — AI analysis complete', 'ok');
+}
+
+// ═════════ CHALLENGE MODE ═════════
+const CHALLENGES = [
+  { q: 'After H gate on |0⟩, what is P(|0⟩)?', opts: ['25%', '50%', '75%', '100%'], answer: 1 },
+  { q: 'X gate on |0⟩ produces which state?', opts: ['|0⟩', '|1⟩', '|+⟩', '|-⟩'], answer: 1 },
+  { q: 'Z gate on |+⟩ = H|0⟩. What happens to P(|0⟩)?', opts: ['Becomes 100%', 'Becomes 0%', 'Stays 50%', 'Becomes 75%'], answer: 2 },
+  { q: 'H → H on |0⟩. Final state?', opts: ['|+⟩', '|-⟩', '|0⟩', '|1⟩'], answer: 2 },
+  { q: 'S gate changes which Bloch parameter?', opts: ['θ (polar)', 'φ (azimuthal)', 'Both', 'Neither'], answer: 1 },
+  { q: 'What is the entropy of |0⟩?', opts: ['0 bits', '0.5 bits', '1 bit', 'undefined'], answer: 0 },
+  { q: 'Y gate = ?', opts: ['X then Z', 'Z then X', 'iXZ', 'iZX'], answer: 2 },
+  { q: 'After X gate, where is Bloch vector?', opts: ['North pole', 'South pole', 'Equator', 'Origin'], answer: 1 },
+  { q: 'T gate phase rotation angle?', opts: ['π/2', 'π/4', 'π/8', 'π'], answer: 1 },
+  { q: 'Bell state |Φ⁺⟩ measurement correlation?', opts: ['Always same', 'Always opposite', 'Random', '50/50'], answer: 0 },
+];
+
+let challengeActive = false;
+let currentChallenge = null;
+let challengeIdx = 0;
+let challengeScore = 0;
+
+function toggleChallenge() {
+  challengeActive = !challengeActive;
+  document.getElementById('challenge-panel').style.display = challengeActive ? 'block' : 'none';
+  const btn = document.getElementById('challenge-toggle');
+  btn.textContent = challengeActive ? 'CHALLENGE [ON]' : 'CHALLENGE [F3]';
+  if (challengeActive) loadChallenge();
+  addLog('CHALLENGE_MODE: ' + (challengeActive ? 'ACTIVATED' : 'DEACTIVATED'), 'sys');
+}
+
+function loadChallenge() {
+  currentChallenge = CHALLENGES[challengeIdx % CHALLENGES.length];
+  document.getElementById('challenge-q').textContent = '⚡ PREDICT: ' + currentChallenge.q;
+  const optsEl = document.getElementById('challenge-opts');
+  optsEl.innerHTML = '';
+  currentChallenge.opts.forEach((opt, i) => {
+    const btn = document.createElement('div');
+    btn.className = 'c-opt';
+    btn.textContent = opt;
+    btn.onclick = () => checkAnswer(i);
+    optsEl.appendChild(btn);
+  });
+}
+
+function checkAnswer(idx) {
+  const opts = document.querySelectorAll('.c-opt');
+  opts.forEach((btn, i) => {
+    if (i === currentChallenge.answer) btn.classList.add('correct');
+    else if (i === idx && i !== currentChallenge.answer) btn.classList.add('wrong');
+    btn.onclick = null;
+  });
+  if (idx === currentChallenge.answer) {
+    challengeScore++;
+    addLog('CHALLENGE_CORRECT ✓ Score: ' + challengeScore, 'ok');
+  } else {
+    addLog('CHALLENGE_INCORRECT — answer: ' + currentChallenge.opts[currentChallenge.answer], 'err');
+  }
+  setTimeout(() => { challengeIdx++; loadChallenge(); }, 2000);
+}
+
+function revealChallenge(result) {
+  addLog('MEASURE_RESULT=' + result + ' — verify against prediction', 'sys');
+}
+
+// ═════════ CLOCK & UPTIME ═════════
+const startTime = Date.now();
+function updateClock() {
+  const now = new Date();
+  document.getElementById('sys-clock').textContent =
+    pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+
+  const upSec = Math.floor((Date.now() - startTime) / 1000);
+  const m = Math.floor(upSec / 60), s = upSec % 60;
+  document.getElementById('uptime').textContent = (m > 0 ? m + 'm ' : '') + s + 's';
+}
+setInterval(updateClock, 1000);
+
+// ═════════ KEYBOARD SHORTCUTS ═════════
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT') return;
+  const key = e.key.toUpperCase();
+  if (key === 'H') applyGate('H');
+  else if (key === 'X') applyGate('X');
+  else if (key === 'Y') applyGate('Y');
+  else if (key === 'Z') applyGate('Z');
+  else if (key === 'M') measure();
+  else if (key === 'R') resetState();
+  else if (key === 'E') explainState();
+  else if (key === 'U') undoGate();
+  else if (e.key === 'F1') { e.preventDefault(); }
+  else if (e.key === 'F3') { e.preventDefault(); toggleChallenge(); }
+});
+
+// ═════════ RESIZE HANDLER ═════════
+window.addEventListener('resize', () => {
+  const mount = document.getElementById('bloch-mount');
+  if (!mount || !renderer) return;
+  const w = mount.clientWidth, h = mount.clientHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+});
+
+// ═════════ INITIALIZATION ═════════
+window.addEventListener('load', () => {
+  initThreeJS();
+  updateClock();
+  updateAllUI();
+
+  addLog('SYSTEM_BOOT_SEQUENCE_INITIATED', 'sys');
+  setTimeout(() => addLog('THREE.JS_RENDERER_MOUNTED — WebGL2', 'ok'), 200);
+  setTimeout(() => addLog('QUANTUM_ENGINE_v2.0_LOADED', 'ok'), 400);
+  setTimeout(() => addLog('COMPLEX_MATH_ENGINE_READY', 'ok'), 600);
+  setTimeout(() => addLog('BLOCH_SPHERE_3D_INITIALIZED', 'ok'), 800);
+  setTimeout(() => addLog('GATE_LIBRARY_LOADED: H X Y Z S T Rx Ry', 'info'), 1000);
+  setTimeout(() => addLog('QUBIT_STATE → |0⟩ GROUND', 'info'), 1200);
+  setTimeout(() => addLog('KEYBOARD_SHORTCUTS_ACTIVE', 'info'), 1400);
+  setTimeout(() => addLog('SYSTEM_READY — awaiting input...', 'ok'), 1600);
+  setTimeout(() => addLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'sys'), 1800);
+});
+</script>
+</body>
+</html>
