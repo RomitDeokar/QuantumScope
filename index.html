@@ -1100,7 +1100,7 @@ function updateArrowInspector(){
   const bx=QState.blochX,by=QState.blochY,bz=QState.blochZ;
   const absVals=[['X',Math.abs(bx)],['Y',Math.abs(by)],['Z',Math.abs(bz)]].sort((a,b)=>b[1]-a[1]);
   const axis=absVals[0][0];
-  const raw=axis==='X' ? bx : (axis==='Y' ? by : bz);
+  const raw=axis==='X'?bx:axis==='Y'?by:bz;
   const sign=raw>=0?'+':'-';
   const dirLabel=axis==='Z'?(raw>=0?'+Z / |0⟩':'-Z / |1⟩'):(sign+axis+' AXIS');
   document.getElementById('arrow-dir').textContent=dirLabel;
@@ -1285,12 +1285,7 @@ window.loadPreset=function(name){
 
 window.exportCircuit=function(){
   let qasm='OPENQASM 2.0;\ninclude "qelib1.inc";\nqreg q[1];\ncreg c[1];\n\n// QuantumScope QS-01 Circuit Export\n// Generated: '+new Date().toISOString()+'\n\n';
-  let exportedOps=0,conceptOps=0;
-  QState.gateDefHistory.forEach(g=>{if(g.qasm){qasm+=g.qasm+'\n';exportedOps++;}});
-  QState.gateHistory.forEach(token=>{
-    if(token==='CNOT'){qasm+='// conceptual Bell/teleport entangler omitted in single-qubit export\n';conceptOps++;}
-    else if(token==='M→'){qasm+='// conceptual teleportation measurement/correction step omitted in single-qubit export\n';conceptOps++;}
-  });
+  QState.gateDefHistory.forEach(g=>{qasm+=(g.qasm||'// unknown gate')+'\n';});
   qasm+='\nmeasure q[0] -> c[0];\n';
   const blob=new Blob([qasm],{type:'text/plain'});const url=URL.createObjectURL(blob);
   const a=document.createElement('a');a.href=url;a.download='quantumscope_circuit.qasm';
@@ -1485,7 +1480,6 @@ function vibrateBloch(cb){
 // =====================================================
 let bellRendererA,bellRendererB,bellSceneA,bellSceneB,bellCamA,bellCamB,bellArrowA,bellArrowB;
 let bellInitialized=false,bellAnimRunning=false,bellManualUntil=0;
-const bellMountReady={a:false,b:false};
 
 function initBellSpheres(){
   if(!bellInitialized)bellInitialized=true;
@@ -1554,8 +1548,8 @@ window.runWinningDemo=function(){
     [900,()=>applyGate('H')],
     [1200,()=>explainState()],
     [2100,()=>measure()],
-    [3600,()=>loadPreset('bell')],
-    [4300,()=>explainState()]
+    [3500,()=>loadPreset('bell')],
+    [3900,()=>explainState()]
   ];
   steps.forEach(([delay,fn])=>setTimeout(fn,delay));
 };
