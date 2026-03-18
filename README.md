@@ -8,7 +8,7 @@
 ## Live Demo
 
 https://8080-i4qvcggk5vfd30sciierx-2e1b9533.sandbox.novita.ai/ <br>
-     (or)
+     (or) <br>
 Open `index.html` in any modern browser. No build step, no dependencies to install. **Zero-config, single-file architecture.**
 
 ---
