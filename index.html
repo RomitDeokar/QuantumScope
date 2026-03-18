@@ -62,7 +62,7 @@ body.light-theme::after{background-image:linear-gradient(rgba(13,136,174,0.04) 1
 .theme-toggle:hover{background:var(--bg4);color:var(--white);}
 .theme-toggle.light{border-color:var(--amber2);color:var(--amber);background:var(--amber-dim);}
 
-.layout{display:grid;grid-template-columns:236px 1fr 264px;gap:7px;padding:7px;height:calc(100vh - 46px);overflow:hidden;}
+.layout{display:grid;grid-template-columns:236px 1fr 264px;gap:7px;padding:7px;height:calc(100vh - 46px);overflow-y:auto;overflow-x:hidden;}
 .layout.shaking{animation:shake 0.35s ease-out;}
 .col{display:flex;flex-direction:column;gap:5px;overflow:hidden;min-height:0;}
 .layout>.col:last-child{overflow-y:auto;overflow-x:hidden;height:100%;}
