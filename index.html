@@ -1283,6 +1283,7 @@ window.applyGate=function(gateName){
 
 window.showAngleInput=function(type){pendingAngleGate=type;document.getElementById('angle-wrap').classList.add('show');document.getElementById('angle-label').textContent=type+'(\u03b8):';document.getElementById('angle-val').focus();};
 window.applyAngleGate=function(){
+  hideDemoHint();
   const deg=parseFloat(document.getElementById('angle-val').value)||90;
   const gate=pendingAngleGate==='Rx'?makeRx(deg):pendingAngleGate==='Ry'?makeRy(deg):makeRz(deg);
   document.getElementById('angle-wrap').classList.remove('show');
