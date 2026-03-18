@@ -63,6 +63,7 @@ body.light-theme::after{background-image:linear-gradient(rgba(13,136,174,0.04) 1
 .theme-toggle.light{border-color:var(--amber2);color:var(--amber);background:var(--amber-dim);}
 
 .layout{display:grid;grid-template-columns:236px 1fr 264px;gap:7px;padding:7px;height:calc(100vh - 46px);overflow:hidden;}
+.layout.shaking{animation:shake 0.35s ease-out;}
 .col{display:flex;flex-direction:column;gap:5px;overflow:hidden;min-height:0;}
 
 .panel{border:1px solid var(--border2);background:var(--bg2);display:flex;flex-direction:column;overflow:hidden;position:relative;transition:border-color 0.3s;border-radius:var(--radius);}
@@ -192,6 +193,9 @@ body.light-theme::after{background-image:linear-gradient(rgba(13,136,174,0.04) 1
 @keyframes logFade{from{opacity:0;transform:translateX(-4px);}to{opacity:1;transform:translateX(0);}}
 .log-time{color:var(--text3);min-width:52px;flex-shrink:0;font-size:8px;}
 .log-ok{color:var(--green);}.log-info{color:var(--cyan);}.log-warn{color:var(--amber);}.log-err{color:var(--red);}.log-sys{color:var(--purple);}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:0.35;}}
+@keyframes bannerPop{from{transform:translate(-50%,-50%) scale(0.6);opacity:0;}to{transform:translate(-50%,-50%) scale(1);opacity:1;}}
+@keyframes shake{0%,100%{transform:translateX(0);}20%{transform:translateX(-4px);}40%{transform:translateX(4px);}60%{transform:translateX(-3px);}80%{transform:translateX(2px);}}
 
 .challenge-box{background:var(--amber-dim);border:1px solid var(--amber2);padding:7px;margin-top:5px;}
 .challenge-q{font-size:8px;color:var(--amber);line-height:1.5;margin-bottom:5px;font-family:var(--font-main);letter-spacing:0.5px;}
@@ -371,6 +375,7 @@ body.light-theme::after{background-image:linear-gradient(rgba(13,136,174,0.04) 1
     <span class="pill pill-cyan" id="tab-analysis">ANALYSIS [F2]</span>
     <span class="pill pill-amber" id="challenge-toggle" onclick="toggleChallenge()">CHALLENGE [F3]</span>
     <span class="pill pill-cyan" onclick="runWinningDemo()" style="cursor:pointer">AUTO DEMO</span>
+    <span class="pill pill-cyan" id="live-counter" style="font-size:7px;letter-spacing:1px;">GATES: <span id="tc-gates">0</span> | SHOTS: <span id="tc-shots">0</span></span>
     <span class="pill pill-cyan" onclick="showTutorial()" style="cursor:pointer">? GUIDE</span>
     <span class="theme-toggle" id="theme-toggle" onclick="toggleTheme()">LIGHT MODE</span>
     <span class="sound-toggle" id="sound-toggle" onclick="toggleSound()">&#9834; SFX</span>
@@ -378,6 +383,7 @@ body.light-theme::after{background-image:linear-gradient(rgba(13,136,174,0.04) 1
     <span class="sys-clock" id="sys-clock">--:--:--</span>
   </div>
 </div>
+<div id="demo-hint" style="position:fixed;top:44px;left:0;right:0;text-align:center;padding:4px;background:rgba(0,229,255,0.06);border-bottom:1px solid var(--cyan3);font-family:var(--font-main);font-size:8px;letter-spacing:2px;color:var(--cyan);animation:blink 1.2s infinite;cursor:pointer;flex-shrink:0;z-index:18;" onclick="runWinningDemo();this.style.display='none'">▶ CLICK HERE OR PRESS AUTO DEMO TO SEE THE FULL QUANTUM DEMONSTRATION SEQUENCE</div>
 
 <div class="layout">
   <!-- LEFT COLUMN -->
@@ -467,7 +473,7 @@ body.light-theme::after{background-image:linear-gradient(rgba(13,136,174,0.04) 1
           <div class="kb-hint"><kbd>H</kbd>Had</div><div class="kb-hint"><kbd>X</kbd>PX</div>
           <div class="kb-hint"><kbd>M</kbd>Meas</div><div class="kb-hint"><kbd>R</kbd>Rst</div>
           <div class="kb-hint"><kbd>U</kbd>Undo</div><div class="kb-hint"><kbd>B</kbd>Bell</div>
-          <div class="kb-hint"><kbd>P</kbd>Tele</div><div class="kb-hint"><kbd>?</kbd>Guide</div>
+          <div class="kb-hint"><kbd>P</kbd>Tele</div><div class="kb-hint"><kbd>F</kbd>Focus</div><div class="kb-hint"><kbd>?</kbd>Guide</div>
         </div>
       </div>
     </div>
@@ -792,9 +798,13 @@ function playGateSound(gateName){
 function playCollapseSound(){
   if(!soundEnabled)return;initAudio();
   const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.connect(g);g.connect(audioCtx.destination);
-  o.frequency.setValueAtTime(800,audioCtx.currentTime);o.frequency.exponentialRampToValueAtTime(80,audioCtx.currentTime+0.4);
-  o.type='sawtooth';g.gain.setValueAtTime(0.06,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+0.4);
-  o.start();o.stop(audioCtx.currentTime+0.4);
+  o.frequency.setValueAtTime(660,audioCtx.currentTime);o.frequency.exponentialRampToValueAtTime(55,audioCtx.currentTime+0.6);
+  o.type='sine';g.gain.setValueAtTime(0.12,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+0.6);
+  o.start();o.stop(audioCtx.currentTime+0.6);
+  const o2=audioCtx.createOscillator(),g2=audioCtx.createGain();o2.connect(g2);g2.connect(audioCtx.destination);
+  o2.frequency.setValueAtTime(330,audioCtx.currentTime);o2.frequency.exponentialRampToValueAtTime(27,audioCtx.currentTime+0.6);
+  o2.type='triangle';g2.gain.setValueAtTime(0.06,audioCtx.currentTime);g2.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+0.6);
+  o2.start();o2.stop(audioCtx.currentTime+0.6);
 }
 function playSuccessSound(){
   if(!soundEnabled)return;initAudio();
@@ -826,10 +836,10 @@ function initParticles(){
   for(let i=0;i<N;i++)particles.push({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-0.5)*0.3,vy:(Math.random()-0.5)*0.3,r:Math.random()*1.5+0.5,a:Math.random()*0.3+0.1});
   function draw(){
     ctx.clearRect(0,0,W,H);
+    const isDark=!document.body.classList.contains('light-theme');
     particles.forEach(p=>{
       p.x+=p.vx;p.y+=p.vy;
       if(p.x<0)p.x=W;if(p.x>W)p.x=0;if(p.y<0)p.y=H;if(p.y>H)p.y=0;
-      const isDark=!document.body.classList.contains('light-theme');
       const particleAlpha=isDark?p.a:(p.a*0.4);
       const particleColor=isDark?'0,229,255':'0,100,160';
       ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle='rgba('+particleColor+','+particleAlpha+')';ctx.fill();
@@ -837,12 +847,13 @@ function initParticles(){
     // Draw connections
     for(let i=0;i<N;i++)for(let j=i+1;j<N;j++){
       const dx=particles[i].x-particles[j].x,dy=particles[i].y-particles[j].y,d=Math.sqrt(dx*dx+dy*dy);
-      if(d<120){ctx.beginPath();ctx.moveTo(particles[i].x,particles[i].y);ctx.lineTo(particles[j].x,particles[j].y);ctx.strokeStyle='rgba(0,229,255,'+(0.06*(1-d/120))+')';ctx.stroke();}
+      if(d<120){const lineColor=isDark?'0,229,255':'0,100,160';ctx.beginPath();ctx.moveTo(particles[i].x,particles[i].y);ctx.lineTo(particles[j].x,particles[j].y);ctx.strokeStyle='rgba('+lineColor+','+(0.06*(1-d/120))+')';ctx.stroke();}
     }
     requestAnimationFrame(draw);
   }
   draw();
 }
+function hideDemoHint(){const hint=document.getElementById('demo-hint');if(hint)hint.style.display='none';}
 
 // =====================================================
 //  UI UPDATE ENGINE
@@ -882,6 +893,9 @@ function updateAllUI(){
   nf.className='norm-fill'+(nv>0.999?'':nv>0.95?' warn':' err');
   document.getElementById('stat-gates').textContent=QState.gatesApplied;
   document.getElementById('stat-measures').textContent=QState.measureCount;
+  const tcg=document.getElementById('tc-gates'),tcs=document.getElementById('tc-shots');
+  if(tcg)tcg.textContent=QState.gatesApplied;
+  if(tcs)tcs.textContent=QState.measureCount;
   document.getElementById('stat-entropy').textContent=QState.entropy.toFixed(3);
   document.getElementById('stat-fidelity').textContent=QState.groundProbability.toFixed(3);
   document.getElementById('stat-purity').textContent=Math.min(1,QState.purity).toFixed(3);
@@ -1161,6 +1175,7 @@ function updateCircuit(){
 //  GATE APPLICATION
 // =====================================================
 window.applyGate=function(gateName){
+  hideDemoHint();
   if(QState.measured)resetState();
   QState.bellMode=false;
   document.getElementById('bell-info').style.display='none';
@@ -1179,6 +1194,7 @@ window.applyGate=function(gateName){
 let pendingAngleGate='Rx';
 window.showAngleInput=function(type){pendingAngleGate=type;document.getElementById('angle-wrap').classList.add('show');document.getElementById('angle-label').textContent=type+'(\u03b8):';document.getElementById('angle-val').focus();};
 window.applyAngleGate=function(){
+  hideDemoHint();
   const deg=parseFloat(document.getElementById('angle-val').value)||90;
   const gate=pendingAngleGate==='Rx'?makeRx(deg):makeRy(deg);
   document.getElementById('angle-wrap').classList.remove('show');
@@ -1194,10 +1210,13 @@ window.applyAngleGate=function(){
 //  MEASUREMENT
 // =====================================================
 window.measure=function(){
+  hideDemoHint();
   if(QState.measured)return;
   const p0=QState.p0,rand=Math.random(),result=rand<p0?0:1;
   addLog('MEASUREMENT_INITIATED \u2014 rand='+rand.toFixed(4)+' p0='+p0.toFixed(4),'sys');
   flashOverlay('red');playCollapseSound();
+  document.querySelector('.layout').classList.add('shaking');
+  setTimeout(()=>document.querySelector('.layout').classList.remove('shaking'),350);
   vibrateBloch(()=>{
     QState.alpha=result===0?new Complex(1,0):new Complex(0,0);
     QState.beta=result===0?new Complex(0,0):new Complex(1,0);
@@ -1229,6 +1248,7 @@ function flashOverlay(color){
 //  RESET / UNDO / PRESETS / EXPORT
 // =====================================================
 window.resetState=function(){
+  hideDemoHint();
   QState.reset();stopDecoherence();
   document.getElementById('bell-info').style.display='none';
   document.getElementById('bell-spheres').classList.remove('active');
@@ -1254,6 +1274,7 @@ window.undoGate=function(){
 };
 
 window.loadPreset=function(name){
+  hideDemoHint();
   resetState();
   if(name==='superposition'){applyGate('H');addLog('PRESET: SUPERPOSITION','ok');}
   else if(name==='bitflip'){applyGate('X');addLog('PRESET: BIT_FLIP','ok');}
@@ -1267,6 +1288,13 @@ window.loadPreset=function(name){
     updateAllUI();
     updateGatePhysics({label:'BELL STATE |Φ⁺⟩',matStr:'CNOT·(H⊗I)|00⟩ = (|00⟩+|11⟩)/√2',matVis:['1','0','0','0','0','1','0','0','0','0','0','1','0','0','1','0'],effect:'Maximally entangled |Φ⁺⟩. Measuring one qubit instantly determines the other — nonlocal correlation.',basis:'Bell basis. Reduced density matrix = I/2 (maximally mixed).',bloch:'Two-qubit entanglement | Max correlation'});
     initBellSpheres();addLog('BELL STATE |Φ⁺⟩ ESTABLISHED','sys');addLog('EPR pair — "spooky action at a distance"','info');
+    const oldBanner=document.querySelector('#entangle-banner');if(oldBanner)oldBanner.remove();
+    const banner=document.createElement('div');
+    banner.id='entangle-banner';
+    banner.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(6,10,18,0.96);border:1px solid var(--purple2);padding:28px 48px;text-align:center;z-index:5000;box-shadow:0 0 60px rgba(124,77,255,0.4),0 0 120px rgba(124,77,255,0.15);animation:bannerPop 0.4s cubic-bezier(0.34,1.56,0.64,1);font-family:var(--font-main);';
+    banner.innerHTML='<div style="font-size:9px;letter-spacing:3px;color:var(--purple);margin-bottom:8px;">ENTANGLEMENT ESTABLISHED</div><div style="font-size:22px;font-weight:700;color:#fff;letter-spacing:2px;margin-bottom:6px;">|Φ⁺⟩ = (|00⟩ + |11⟩) / √2</div><div style="font-size:9px;color:var(--purple);letter-spacing:1px;">EINSTEIN: \"SPOOKY ACTION AT A DISTANCE\"</div>';
+    document.body.appendChild(banner);
+    setTimeout(()=>banner.remove(),2200);
   }
   else if(name==='teleport'){
     addLog('TELEPORTATION PROTOCOL INITIATED','sys');
@@ -1539,16 +1567,24 @@ function initBellSpheres(){
 function setBellCollapse(result){
   if(!bellArrowA||!bellArrowB)return;
   bellManualUntil=Date.now()+1800;
-  const up=new THREE.Vector3(0,1,0);
-  const dir=new THREE.Vector3(0,result===0?1:-1,0);
-  const q=dir.y>0?new THREE.Quaternion():new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),Math.PI);
+  const q=result===0?new THREE.Quaternion():new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),Math.PI);
   bellArrowA.setRotationFromQuaternion(q);
   bellArrowB.setRotationFromQuaternion(q);
   const corr=document.getElementById('bell-corr');
-  if(corr)corr.textContent='CORRELATION: MEASURED |'+result+'⟩ ON BOTH QUBITS — PERFECTLY LINKED';
+  if(corr){
+    corr.textContent='⚡ CORRELATED: MEASURED |'+result+'⟩ ON BOTH — SPOOKY ACTION CONFIRMED';
+    corr.style.color='var(--amber)';
+    corr.style.animation='blink 0.3s 4';
+    setTimeout(()=>{corr.style.animation='';corr.style.color='var(--purple)';},1400);
+  }
+  ['bell-sphere-a','bell-sphere-b'].forEach((id,i)=>{
+    const el=document.getElementById(id);if(!el)return;
+    setTimeout(()=>{el.style.boxShadow='0 0 20px rgba(179,136,255,0.8)';setTimeout(()=>{el.style.boxShadow='';},600);},i*120);
+  });
 }
 
 window.runWinningDemo=function(){
+  hideDemoHint();
   resetState();
   addLog('AUTO_DEMO: Winning presentation sequence started','sys');
   const steps=[
@@ -1557,7 +1593,8 @@ window.runWinningDemo=function(){
     [1200,()=>explainState()],
     [2100,()=>measure()],
     [3600,()=>loadPreset('bell')],
-    [4300,()=>explainState()]
+    [4300,()=>explainState()],
+    [5200,()=>{if(!challengeActive)toggleChallenge();addLog('DEMO: Challenge mode — can you predict the outcome?','sys');}]
   ];
   steps.forEach(([delay,fn])=>setTimeout(fn,delay));
 };
@@ -1688,6 +1725,16 @@ document.addEventListener('keydown',e=>{
   else if(k==='R')resetState();else if(k==='E')explainState();
   else if(k==='U')undoGate();else if(k==='B')loadPreset('bell');
   else if(k==='P')loadPreset('teleport');
+  else if(k==='F'&&!e.ctrlKey){
+    const layout=document.querySelector('.layout');
+    const left=document.querySelector('.layout .col:first-child');
+    const right=document.querySelector('.layout .col:last-child');
+    const isPresenting=left.style.display==='none';
+    left.style.display=isPresenting?'':'none';
+    right.style.display=isPresenting?'':'none';
+    layout.style.gridTemplateColumns=isPresenting?'':'0 1fr 0';
+    addLog(isPresenting?'PRESENTATION_MODE: OFF':'PRESENTATION_MODE: ON — [F] to exit','sys');
+  }
   else if(e.key==='?')showTutorial();
   else if(e.key==='F3'){e.preventDefault();toggleChallenge();}
 });
