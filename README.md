@@ -75,12 +75,14 @@ QuantumScope is a **virtual experimental instrument for single-qubit physics** c
 - **Relative phase arc** in purple between the two amplitudes
 - **Real-time update** on every state change
 
-### 8. Wigner Quasi-Probability Function
+### 8. Bloch Projection (θ-φ)
 - **Discrete Wigner function heatmap** rendered on 18x18 grid
 - **Theta-phi parameter space** visualization
 - **Cyan for positive** / **red for negative** quasi-probability regions
 - **Grid overlay** with axis labels
 - **Unique feature**: Maps the full qubit state onto phase space
+
+> Note: In the UI this panel is intentionally labeled as a **Bloch Projection (θ-φ)** so the visualization wording stays physically honest during judging.
 
 ### 9. Entanglement Witness
 - **Coherence-based entanglement indicator**: Measures off-diagonal density matrix elements
@@ -98,7 +100,7 @@ QuantumScope is a **virtual experimental instrument for single-qubit physics** c
 - **3-bit repetition code** educational demonstration
 - **Syndrome detection**: Shows 3 encoded bits with error highlighting
 - **Majority-vote decoding**: Identifies and locates single-bit errors
-- **Noise-aware**: Error probability increases during decoherence simulation
+- **Deterministic demo behavior**: Error location advances with decoherence level instead of flickering randomly frame-to-frame
 - **Visual feedback**: Red bits for detected errors, green for clean
 
 ### 12. Decoherence Simulator
@@ -195,6 +197,7 @@ QuantumScope is a **virtual experimental instrument for single-qubit physics** c
 - **Rounded corners**: Subtle `3px` radius throughout for modern feel
 - **Gate button hover**: Translate-Y lift + controlled shadow
 - **Dark HUD theme**: Custom CSS variables, Orbitron + Share Tech Mono fonts
+- **Light theme**: Clean white lab-sheet mode with preserved accent colors for projector-friendly demos
 - **Collapse flash overlay**: Full-screen radial gradient pulse
 - **Smooth value transitions**: CSS transitions on all numeric displays
 
@@ -258,7 +261,7 @@ Gate Click / Key Press
        +-- Bloch angles (theta, phi from blochX/Y/Z)
        +-- Normalization bar
        +-- State label & badge
-       +-- Statistics (gates, measures, entropy, fidelity, purity)
+       +-- Statistics (gates, shots, entropy, P(|0⟩), purity)
        +-- Density matrix (rho_ij)
        +-- Tomography bars (<X>, <Y>, <Z>)
        +-- Phase wheel (canvas)
