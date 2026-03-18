@@ -137,6 +137,7 @@ QuantumScope is a **virtual experimental instrument for single-qubit physics** c
 - **Full-screen collapse flash overlay** (red radial gradient)
 - **Multi-measurement mode**: 100-shot statistical sampling without state destruction
 - **Measurement histogram**: Bar chart of |0> vs |1> outcomes with counts
+- **Shot counter semantics**: The top ticker reports total measurement shots, so `MULTI(100)` increments by 100 intentionally
 - **Bell collapse cue**: In Bell preset mode, both mini Bloch spheres snap to the same pole after measurement to reinforce perfect correlation
 
 ### 18. Arrow Direction Inspector
@@ -175,6 +176,7 @@ QuantumScope is a **virtual experimental instrument for single-qubit physics** c
 
 ### 24. Export Capabilities
 - **QASM Export**: OpenQASM 2.0 circuit file download using the standard `qelib1.inc` include
+- **Preset-safe export**: Bell/teleport conceptual steps are emitted as explanatory comments instead of ambiguous unknown-gate lines
 - **JSON Export**: Full state snapshot including amplitudes, Bloch vector, probabilities, metrics, gate history, histogram
 
 ### 25. Prognosis Engine
