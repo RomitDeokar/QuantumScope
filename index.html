@@ -332,7 +332,7 @@ body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(r
     <div class="tutorial-step" id="tutorial-step">STEP 1 / 6</div>
     <div class="tutorial-title" id="tutorial-title">WELCOME TO QUANTUMSCOPE</div>
     <div class="tutorial-text" id="tutorial-text">
-      QuantumScope is a real-time quantum state simulator. Click gates to manipulate a qubit, watch the Bloch sphere respond, and explore quantum mechanics interactively.
+      QuantumScope is a virtual experimental instrument for understanding qubit evolution, gate physics, and quantum measurement in real time. Click gates to manipulate a qubit, watch the Bloch sphere respond, and explore quantum mechanics interactively.
     </div>
     <div>
       <span class="tutorial-btn" id="tutorial-next" onclick="nextTutorial()">NEXT &rarr;</span>
@@ -350,6 +350,7 @@ body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(r
     <span class="pill pill-cyan active" id="tab-circuit">CIRCUIT [F1]</span>
     <span class="pill pill-cyan" id="tab-analysis">ANALYSIS [F2]</span>
     <span class="pill pill-amber" id="challenge-toggle" onclick="toggleChallenge()">CHALLENGE [F3]</span>
+    <span class="pill pill-cyan" onclick="runWinningDemo()" style="cursor:pointer">AUTO DEMO</span>
     <span class="pill pill-cyan" onclick="showTutorial()" style="cursor:pointer">? GUIDE</span>
     <span class="sound-toggle" id="sound-toggle" onclick="toggleSound()">&#9834; SFX</span>
     <span class="pill pill-green" id="sys-status">ONLINE :: <span id="uptime">0s</span></span>
@@ -499,6 +500,11 @@ body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(r
           <div class="stat-item">ENTROPY: <span id="stat-entropy">0.000</span></div>
           <div class="stat-item">FIDELITY: <span id="stat-fidelity">1.000</span></div>
           <div class="stat-item">PURITY: <span id="stat-purity">1.000</span></div>
+        </div>
+        <div class="stats-ticker" id="vector-ticker">
+          <div class="stat-item">ARROW_DIR: <span id="arrow-dir">+Z / |0&#10217;</span></div>
+          <div class="stat-item">BASIS_ZONE: <span id="basis-zone">COMPUTATIONAL</span></div>
+          <div class="stat-item">PHASE_REGIME: <span id="phase-regime">REAL+</span></div>
         </div>
 
         <div id="bell-info">
@@ -741,6 +747,7 @@ const QState={
     this.alpha=new Complex(1,0);this.beta=new Complex(0,0);
     this.gateHistory=[];this.gateDefHistory=[];this.measured=false;
     this.collapsedTo=null;this.bellMode=false;this.histogram={0:0,1:0};
+    this.gatesApplied=0;this.measureCount=0;
     this.snapshots=[{alpha:new Complex(1,0),beta:new Complex(0,0),label:'init'}];
   }
 };
@@ -844,6 +851,7 @@ function updateAllUI(){
   document.getElementById('stat-fidelity').textContent=QState.fidelity.toFixed(3);
   document.getElementById('stat-purity').textContent=Math.min(1,QState.purity).toFixed(3);
   document.getElementById('gate-count').textContent=QState.gateHistory.length+' GATES';
+  updateArrowInspector();
   updatePrognosis();updateHistogram();updateDensityMatrix();updateTomography();updatePhaseWheel();updateWigner();updateEntanglementWitness();updateFidelityComparator();updateQEC();updatePurityBar();updateTimeline();updateComplexity();animateBlochTarget();
 }
 
@@ -1061,6 +1069,20 @@ function updateComplexity(){
   document.getElementById('complexity-val').textContent=c;
 }
 
+function updateArrowInspector(){
+  const bx=QState.blochX,by=QState.blochY,bz=QState.blochZ;
+  const absVals=[['X',Math.abs(bx)],['Y',Math.abs(by)],['Z',Math.abs(bz)]].sort((a,b)=>b[1]-a[1]);
+  const axis=absVals[0][0];
+  const raw=axis==='X'?bx:axis==='Y'?by:bz;
+  const sign=raw>=0?'+':'-';
+  const dirLabel=axis==='Z'?(raw>=0?'+Z / |0⟩':'-Z / |1⟩'):(sign+axis+' AXIS');
+  document.getElementById('arrow-dir').textContent=dirLabel;
+  const zone=Math.abs(bz)>0.75?'COMPUTATIONAL':Math.abs(bx)>0.75?'HADAMARD-X':Math.abs(by)>0.75?'PHASE-Y':'SUPERPOSITION';
+  document.getElementById('basis-zone').textContent=zone;
+  const rel=QState.beta.abs()<1e-6?'REAL+':((QState.beta.phase()-QState.alpha.phase())*180/Math.PI);
+  document.getElementById('phase-regime').textContent=typeof rel==='string'?rel:((rel%360+360)%360).toFixed(1)+'°';
+}
+
 function updatePrognosis(){
   const p0=QState.p0,val=document.getElementById('prognosis-val'),trend=document.getElementById('prognosis-trend'),badge=document.getElementById('prognosis-badge');
   if(QState.measured){val.textContent='100%';val.style.color='var(--green)';trend.textContent='COLLAPSED \u2014 deterministic';badge.textContent='COLLAPSED';}
@@ -1151,6 +1173,7 @@ window.measure=function(){
     QState.beta=result===0?new Complex(0,0):new Complex(1,0);
     QState.measured=true;QState.collapsedTo=result;QState.measureCount++;QState.histogram[result]++;
     updateAllUI();
+    if(QState.bellMode)setBellCollapse(result);
     addLog('WAVEFUNCTION_COLLAPSED \u2192 |'+result+'\u27e9','err');
     addLog('P(|'+result+'\u27e9) was '+(result===0?p0:1-p0).toFixed(4),'info');
     if(challengeActive&&currentChallenge)revealChallenge(result);
@@ -1180,6 +1203,7 @@ window.resetState=function(){
   document.getElementById('bell-info').style.display='none';
   document.getElementById('bell-spheres').classList.remove('active');
   document.getElementById('bell-corr').style.display='none';
+  document.getElementById('bell-corr').innerHTML='&#10216;&#968;| CORRELATION: MAXIMALLY ENTANGLED &mdash; IDENTICAL OUTCOMES &#10217;';
   document.getElementById('angle-wrap').classList.remove('show');
   trailPoints=[];
   updateAllUI();updateCircuit();
@@ -1205,10 +1229,14 @@ window.loadPreset=function(name){
   else if(name==='bitflip'){applyGate('X');addLog('PRESET: BIT_FLIP','ok');}
   else if(name==='phaseflip'){applyGate('H');applyGate('Z');addLog('PRESET: PHASE_FLIP','ok');}
   else if(name==='bell'){
-    QState.bellMode=true;applyGate('H');QState.gateHistory.push('CNOT');updateCircuit();
+    applyGate('H');
+    QState.bellMode=true;
+    QState.gateHistory.push('CNOT');updateCircuit();
     document.getElementById('bell-info').style.display='block';document.getElementById('bell-spheres').classList.add('active');document.getElementById('bell-corr').style.display='block';
-    updateGatePhysics({label:'BELL STATE |\u03a6\u207a\u27e9',matStr:'CNOT\u00b7(H\u2297I)|00\u27e9 = (|00\u27e9+|11\u27e9)/\u221a2',matVis:['1','0','0','0','0','1','0','0','0','0','0','1','0','0','1','0'],effect:'Maximally entangled |\u03a6\u207a\u27e9. Measuring one qubit instantly determines the other \u2014 nonlocal correlation.',basis:'Bell basis. Reduced density matrix = I/2 (maximally mixed).',bloch:'Two-qubit entanglement | Max correlation'});
-    initBellSpheres();addLog('BELL STATE |\u03a6\u207a\u27e9 ESTABLISHED','sys');addLog('EPR pair \u2014 "spooky action at a distance"','info');
+    document.getElementById('bell-corr').innerHTML='&#10216;&#968;| CORRELATION: MAXIMALLY ENTANGLED &mdash; IDENTICAL OUTCOMES &#10217;';
+    updateAllUI();
+    updateGatePhysics({label:'BELL STATE |Φ⁺⟩',matStr:'CNOT·(H⊗I)|00⟩ = (|00⟩+|11⟩)/√2',matVis:['1','0','0','0','0','1','0','0','0','0','0','1','0','0','1','0'],effect:'Maximally entangled |Φ⁺⟩. Measuring one qubit instantly determines the other — nonlocal correlation.',basis:'Bell basis. Reduced density matrix = I/2 (maximally mixed).',bloch:'Two-qubit entanglement | Max correlation'});
+    initBellSpheres();addLog('BELL STATE |Φ⁺⟩ ESTABLISHED','sys');addLog('EPR pair — "spooky action at a distance"','info');
   }
   else if(name==='teleport'){
     addLog('TELEPORTATION PROTOCOL INITIATED','sys');
@@ -1229,7 +1257,7 @@ window.loadPreset=function(name){
 };
 
 window.exportCircuit=function(){
-  let qasm='OPENQASM 2.0;\ninclude "qgate.inc";\nqreg q[1];\ncreg c[1];\n\n// QuantumScope QS-01 Circuit Export\n// Generated: '+new Date().toISOString()+'\n\n';
+  let qasm='OPENQASM 2.0;\ninclude "qelib1.inc";\nqreg q[1];\ncreg c[1];\n\n// QuantumScope QS-01 Circuit Export\n// Generated: '+new Date().toISOString()+'\n\n';
   QState.gateDefHistory.forEach(g=>{qasm+=(g.qasm||'// unknown gate')+'\n';});
   qasm+='\nmeasure q[0] -> c[0];\n';
   const blob=new Blob([qasm],{type:'text/plain'});const url=URL.createObjectURL(blob);
@@ -1274,10 +1302,15 @@ function startDecoherence(){
 }
 function stopDecoherence(){
   decoherenceActive=false;if(decoherenceInterval)clearInterval(decoherenceInterval);decoherenceInterval=null;
+  decoherenceLevel=0;
   document.getElementById('deco-toggle').textContent='START DECOHERENCE';
-  document.getElementById('deco-badge').textContent='T2=\u221e';document.getElementById('deco-badge').className='pill pill-amber';
+  document.getElementById('deco-badge').textContent='T2=∞';document.getElementById('deco-badge').className='pill pill-amber';
   document.getElementById('deco-badge').style.fontSize='7px';
+  document.getElementById('deco-fill').style.width='0%';
+  document.getElementById('deco-pct').textContent='0%';
+  document.getElementById('deco-label').textContent='COHERENT';
 }
+
 
 window.noiseKick=function(){
   if(QState.measured){addLog('NOISE: Reset first','warn');return;}
@@ -1340,7 +1373,7 @@ function initThreeJS(){
     scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineBasicMaterial({color:0x1a5566,transparent:true,opacity:0.16})));
   });
   // Axes (Bloch: Z=up(Y), X=right(X), Y=forward(Z) )
-  [{dir:[1,0,0],c:0xff1744},{dir:[-1,0,0],c:0x550011},{dir:[0,1,0],c:0x00e676},{dir:[0,-1,0],c:0x004411},{dir:[0,0,1],c:0x00bcd4},{dir:[0,0,-1],c:0x003344}].forEach(a=>{
+  [{dir:[1,0,0],c:0xff1744},{dir:[-1,0,0],c:0x550011},{dir:[0,1,0],c:0x00e5ff},{dir:[0,-1,0],c:0x003344},{dir:[0,0,1],c:0x00e676},{dir:[0,0,-1],c:0x004411}].forEach(a=>{
     scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0),new THREE.Vector3(...a.dir).multiplyScalar(1.28)]),new THREE.LineBasicMaterial({color:a.c,transparent:true,opacity:0.5})));
   });
   // Labels
@@ -1419,7 +1452,7 @@ function vibrateBloch(cb){
 //  BELL STATE MINI SPHERES
 // =====================================================
 let bellRendererA,bellRendererB,bellSceneA,bellSceneB,bellCamA,bellCamB,bellArrowA,bellArrowB;
-let bellInitialized=false,bellAnimRunning=false;
+let bellInitialized=false,bellAnimRunning=false,bellManualUntil=0;
 
 function initBellSpheres(){
   if(bellInitialized)return;bellInitialized=true;
@@ -1446,9 +1479,11 @@ function initBellSpheres(){
     (function anim(){requestAnimationFrame(anim);ba+=0.01;
       if(bellArrowA&&bellArrowB){
         const up=new THREE.Vector3(0,1,0);
-        const d=new THREE.Vector3(Math.sin(Math.sin(ba*2)*0.3),Math.cos(Math.sin(ba*2)*0.3),Math.sin(ba*1.5)*0.15).normalize();
-        const q=new THREE.Quaternion().setFromUnitVectors(up,d);
-        bellArrowA.setRotationFromQuaternion(q);bellArrowB.setRotationFromQuaternion(q);
+        if(Date.now()>bellManualUntil){
+          const d=new THREE.Vector3(Math.sin(Math.sin(ba*2)*0.3),Math.cos(Math.sin(ba*2)*0.3),Math.sin(ba*1.5)*0.15).normalize();
+          const q=new THREE.Quaternion().setFromUnitVectors(up,d);
+          bellArrowA.setRotationFromQuaternion(q);bellArrowB.setRotationFromQuaternion(q);
+        }
         if(bellCamA){bellCamA.position.x=Math.cos(ba*0.5)*2.5;bellCamA.position.z=Math.sin(ba*0.5)*2.5;bellCamA.lookAt(0,0,0);}
         if(bellCamB){bellCamB.position.x=Math.cos(ba*0.5+Math.PI)*2.5;bellCamB.position.z=Math.sin(ba*0.5+Math.PI)*2.5;bellCamB.lookAt(0,0,0);}
       }
@@ -1461,6 +1496,32 @@ function initBellSpheres(){
 // =====================================================
 //  SYS LOG
 // =====================================================
+function setBellCollapse(result){
+  if(!bellArrowA||!bellArrowB)return;
+  bellManualUntil=Date.now()+1800;
+  const up=new THREE.Vector3(0,1,0);
+  const dir=new THREE.Vector3(0,result===0?1:-1,0);
+  const q=dir.y>0?new THREE.Quaternion():new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),Math.PI);
+  bellArrowA.setRotationFromQuaternion(q);
+  bellArrowB.setRotationFromQuaternion(q);
+  const corr=document.getElementById('bell-corr');
+  if(corr)corr.textContent='CORRELATION: MEASURED |'+result+'⟩ ON BOTH QUBITS — PERFECTLY LINKED';
+}
+
+window.runWinningDemo=function(){
+  resetState();
+  addLog('AUTO_DEMO: Winning presentation sequence started','sys');
+  const steps=[
+    [250,()=>addLog('DEMO_STEP_1: Start in |0⟩ ground state','info')],
+    [900,()=>applyGate('H')],
+    [1200,()=>explainState()],
+    [2100,()=>measure()],
+    [3500,()=>loadPreset('bell')],
+    [3900,()=>explainState()]
+  ];
+  steps.forEach(([delay,fn])=>setTimeout(fn,delay));
+};
+
 function addLog(msg,type){
   const el=document.getElementById('syslog');const now=new Date();
   const ts='['+pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds())+']';
@@ -1496,7 +1557,7 @@ window.explainState=function(){
 //  TUTORIAL MODE
 // =====================================================
 const TUTORIAL_STEPS=[
-  {title:'WELCOME TO QUANTUMSCOPE',text:'QuantumScope is a physics-accurate quantum state simulator. You will manipulate a single qubit using quantum gates, observe its evolution on the Bloch sphere, and explore fundamental quantum mechanics concepts.'},
+  {title:'WELCOME TO QUANTUMSCOPE',text:'QuantumScope is a virtual experimental instrument for understanding qubit evolution, gate physics, and quantum measurement in real time. You will manipulate a single qubit using quantum gates, observe its evolution on the Bloch sphere, and explore fundamental quantum mechanics concepts.'},
   {title:'THE QUBIT STATE',text:'A qubit is described by |\u03c8\u27e9 = \u03b1|0\u27e9 + \u03b2|1\u27e9 where \u03b1 and \u03b2 are complex numbers. The left panel shows these amplitudes, probabilities P(|0\u27e9) and P(|1\u27e9), and the Bloch sphere angles \u03b8 and \u03c6.'},
   {title:'QUANTUM GATES',text:'Click gate buttons (H, X, Y, Z, S, T) or press keyboard shortcuts. Each gate performs a unitary transformation on the qubit state. The H gate creates superposition; X flips the qubit; Z adds a phase.'},
   {title:'THE BLOCH SPHERE',text:'The 3D Bloch sphere in the center visualizes the qubit state geometrically. |0\u27e9 is at the north pole, |1\u27e9 at the south. Drag to rotate the view. The arrow shows the current state vector, and the trail shows its path.'},
