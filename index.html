@@ -66,6 +66,10 @@ body.light-theme::after{background-image:linear-gradient(rgba(13,136,174,0.04) 1
 .layout.shaking{animation:shake 0.35s ease-out;}
 .col{display:flex;flex-direction:column;gap:5px;overflow:hidden;min-height:0;}
 .layout>.col:last-child{overflow-y:auto;overflow-x:hidden;height:100%;}
+.layout>.col:last-child::-webkit-scrollbar{width:3px;}
+.layout>.col:last-child::-webkit-scrollbar-track{background:var(--bg);}
+.layout>.col:last-child::-webkit-scrollbar-thumb{background:var(--cyan3);border-radius:2px;}
+.layout>.col:last-child::-webkit-scrollbar-thumb:hover{background:var(--cyan2);}
 
 .panel{border:1px solid var(--border2);background:var(--bg2);display:flex;flex-direction:column;overflow:hidden;position:relative;transition:border-color 0.3s;border-radius:var(--radius);}
 .panel:hover{border-color:var(--border3);}
@@ -712,7 +716,7 @@ body.light-theme::after{background-image:linear-gradient(rgba(13,136,174,0.04) 1
       </div>
     </div>
 
-    <div class="panel" style="flex:1 1 0;min-height:0;">
+    <div class="panel" style="flex:1 1 0;min-height:220px;">
       <div class="panel-head">
         <span class="panel-title">SYS_LOG</span>
         <span class="pill pill-green" style="font-size:7px;animation:glow-pulse 2s infinite;">LIVE</span>
