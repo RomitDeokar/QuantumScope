@@ -65,6 +65,7 @@ body.light-theme::after{background-image:linear-gradient(rgba(13,136,174,0.04) 1
 .layout{display:grid;grid-template-columns:236px 1fr 264px;gap:7px;padding:7px;height:calc(100vh - 46px);overflow:hidden;}
 .layout.shaking{animation:shake 0.35s ease-out;}
 .col{display:flex;flex-direction:column;gap:5px;overflow:hidden;min-height:0;}
+.layout>.col:last-child{overflow-y:auto;overflow-x:hidden;}
 
 .panel{border:1px solid var(--border2);background:var(--bg2);display:flex;flex-direction:column;overflow:hidden;position:relative;transition:border-color 0.3s;border-radius:var(--radius);}
 .panel:hover{border-color:var(--border3);}
