@@ -1,7 +1,7 @@
 # QUANTUMSCOPE // QS-01
 ### Interactive Quantum State Evolution Lab
 
-> **QtHack04 -- Problem 16** | Single-file quantum computing simulator with physics-accurate complex linear algebra, real-time 3D Bloch sphere visualization, and educational tooling.
+> **QtHack04 -- Problem 16** | Single-file virtual experimental instrument for understanding qubit evolution, gate physics, and quantum measurement in real time, backed by physics-accurate complex linear algebra, real-time 3D Bloch sphere visualization, and educational tooling.
 
 ---
 
@@ -13,7 +13,7 @@ Open `index.html` in any modern browser. No build step, no dependencies to insta
 
 ## What Makes This Unique
 
-QuantumScope is a **complete quantum mechanics laboratory** compressed into a single HTML file. Every interaction is backed by exact linear algebra on complex numbers, with the Bloch sphere serving as geometric ground truth.
+QuantumScope is a **virtual experimental instrument for single-qubit physics** compressed into a single HTML file. Every interaction is backed by exact linear algebra on complex numbers, with the Bloch sphere serving as geometric ground truth.
 
 ### Core Philosophy
 - **Single source of truth**: One `QState` object. Gate click -> matrix multiplication -> state update -> Bloch vector derivation -> all UI panels sync simultaneously.
@@ -46,12 +46,13 @@ QuantumScope is a **complete quantum mechanics laboratory** compressed into a si
 - **Correct axis mapping**: Bloch Z -> Three.js Y (up), Bloch X -> Three.js X, Bloch Y -> Three.js Z
 - **Enhanced lighting**: 4 point lights (cyan, red, green, blue) + ambient for rich illumination
 
-### 3. Gate Panel & Circuit Builder
+### 3. Gate Panel, Circuit Builder & Demo Flow
 - **Color-coded gate buttons**: Each gate has unique accent color (H=cyan, X=red, Y=amber, Z=green, S=purple, T=pink)
 - **Hover tooltips**: Contextual gate descriptions on hover
 - **Keyboard shortcuts**: H, X, Y, Z, S, T, M (measure), R (reset), U (undo), B (Bell), P (teleport), ? (guide)
 - **Angle input with slider**: Synced range slider + number input for Rx/Ry continuous rotations
 - **Circuit wire visualization**: Live diagram showing gate chips on wire with color-coding
+- **Auto Demo mode**: One-click presentation flow for hackathon judging (`|0⟩ → H → explain → measure → Bell preset`)
 
 ### 4. Gate Physics Panel (3-Tier Explanation)
 - **Unitary Matrix**: Text representation + visual 2x2/4x4 grid display
@@ -74,12 +75,14 @@ QuantumScope is a **complete quantum mechanics laboratory** compressed into a si
 - **Relative phase arc** in purple between the two amplitudes
 - **Real-time update** on every state change
 
-### 8. Wigner Quasi-Probability Function
+### 8. Bloch Projection (θ-φ)
 - **Discrete Wigner function heatmap** rendered on 18x18 grid
 - **Theta-phi parameter space** visualization
 - **Cyan for positive** / **red for negative** quasi-probability regions
 - **Grid overlay** with axis labels
 - **Unique feature**: Maps the full qubit state onto phase space
+
+> Note: In the UI this panel is intentionally labeled as a **Bloch Projection (θ-φ)** so the visualization wording stays physically honest during judging.
 
 ### 9. Entanglement Witness
 - **Coherence-based entanglement indicator**: Measures off-diagonal density matrix elements
@@ -97,7 +100,7 @@ QuantumScope is a **complete quantum mechanics laboratory** compressed into a si
 - **3-bit repetition code** educational demonstration
 - **Syndrome detection**: Shows 3 encoded bits with error highlighting
 - **Majority-vote decoding**: Identifies and locates single-bit errors
-- **Noise-aware**: Error probability increases during decoherence simulation
+- **Deterministic demo behavior**: Error location advances with decoherence level instead of flickering randomly frame-to-frame
 - **Visual feedback**: Red bits for detected errors, green for clean
 
 ### 12. Decoherence Simulator
@@ -128,59 +131,66 @@ QuantumScope is a **complete quantum mechanics laboratory** compressed into a si
 - **Color-coded progress bar**: Green (low) -> Amber (medium) -> Red (high)
 - **Real-time complexity tracking**
 
-### 17. Measurement System
+### 17. Measurement System & Correlated Bell Collapse
 - **Probabilistic collapse**: Uses `Math.random()` against |alpha|^2 with full logging
 - **Measurement vibration animation** on Bloch sphere
 - **Full-screen collapse flash overlay** (red radial gradient)
 - **Multi-measurement mode**: 100-shot statistical sampling without state destruction
 - **Measurement histogram**: Bar chart of |0> vs |1> outcomes with counts
+- **Shot counter semantics**: The top ticker reports total measurement shots, so `MULTI(100)` increments by 100 intentionally
+- **Bell collapse cue**: In Bell preset mode, both mini Bloch spheres snap to the same pole after measurement to reinforce perfect correlation
 
-### 18. Bell State Entanglement
+### 18. Arrow Direction Inspector
+- **Live arrow direction readout**: Explicit `ARROW_DIR`, `BASIS_ZONE`, and `PHASE_REGIME` labels under the Bloch sphere
+- **Axis-verification aid**: Makes the Bloch-to-Three.js mapping auditable during demos and debugging
+
+### 19. Bell State Entanglement
 - **Dual mini Bloch spheres** rendered with separate Three.js scenes
 - **Synchronized arrow animation** showing entanglement correlation
 - **Orbiting cameras** for dramatic visual effect
 - **Full Bell state |Phi+> physics explanation**
 - **CNOT gate representation** in circuit
 
-### 19. Purity Tracking
+### 20. Purity Tracking
 - **State purity bar** showing Tr(rho^2) in real-time
 - **Color-coded**: Green (pure) -> Amber -> Red (mixed)
 - **Tracks decoherence effects** visually
 
-### 20. Sound Engine (Web Audio API)
+### 21. Sound Engine (Web Audio API)
 - **Unique frequency per gate**: H=523Hz, X=330Hz, Y=392Hz, Z=440Hz, S=494Hz, T=587Hz
 - **Measurement collapse sound**: Descending sawtooth sweep 800Hz -> 80Hz
 - **Challenge success arpeggio**: C-E-G major chord sequence
 - **Toggle on/off** from topbar SFX button
 
-### 21. Quantum Challenge Mode (18 Questions)
+### 22. Quantum Challenge Mode (18 Questions)
 - **18 multiple-choice questions** covering quantum mechanics fundamentals
 - **Topics**: Gate effects, Bloch sphere angles, entropy, Bell correlations, no-cloning theorem, purity
 - **Immediate feedback**: Correct (green) / incorrect (red) highlights
 - **Running score tracker** with sound effects for correct answers
 
-### 22. Guided Tutorial Mode
+### 23. Guided Tutorial Mode
 - **6-step interactive walkthrough** for new users
 - **Auto-shows on first visit** (localStorage tracked)
 - **Accessible via `?` key** or topbar GUIDE button
 - **Covers**: qubit state, gates, Bloch sphere, measurement, advanced features
 
-### 23. Export Capabilities
-- **QASM Export**: OpenQASM 2.0 circuit file download
+### 24. Export Capabilities
+- **QASM Export**: OpenQASM 2.0 circuit file download using the standard `qelib1.inc` include
+- **Preset-safe export**: Bell/teleport conceptual steps are emitted as explanatory comments instead of ambiguous unknown-gate lines
 - **JSON Export**: Full state snapshot including amplitudes, Bloch vector, probabilities, metrics, gate history, histogram
 
-### 24. Prognosis Engine
+### 25. Prognosis Engine
 - **Prediction confidence meter**: Based on probability distribution
 - **Labels**: DETERMINISTIC, UNCERTAIN, BIASED, COLLAPSED
 - **Trend indicator**: Shows which state is favored
 
-### 25. System Log
+### 26. System Log
 - **Color-coded event log**: OK (green), INFO (cyan), WARN (amber), ERR (red), SYS (purple)
 - **Timestamped entries** with smooth fade-in animation
 - **150-entry buffer** with auto-scroll and auto-prune
 - **Boot sequence**: Timed system log entries simulating OS boot with module loading
 
-### 26. Visual Design
+### 27. Visual Design
 - **Animated particle background**: 35 particles with connection lines (canvas), subtle opacity
 - **Scanline overlay**: Subtle CRT-style scan effect (reduced for polish)
 - **Grid overlay**: 48px cyan grid pattern at low opacity
@@ -189,6 +199,7 @@ QuantumScope is a **complete quantum mechanics laboratory** compressed into a si
 - **Rounded corners**: Subtle `3px` radius throughout for modern feel
 - **Gate button hover**: Translate-Y lift + controlled shadow
 - **Dark HUD theme**: Custom CSS variables, Orbitron + Share Tech Mono fonts
+- **Light theme**: Clean white lab-sheet mode with preserved accent colors for projector-friendly demos
 - **Collapse flash overlay**: Full-screen radial gradient pulse
 - **Smooth value transitions**: CSS transitions on all numeric displays
 
@@ -252,7 +263,7 @@ Gate Click / Key Press
        +-- Bloch angles (theta, phi from blochX/Y/Z)
        +-- Normalization bar
        +-- State label & badge
-       +-- Statistics (gates, measures, entropy, fidelity, purity)
+       +-- Statistics (gates, shots, entropy, P(|0⟩), purity)
        +-- Density matrix (rho_ij)
        +-- Tomography bars (<X>, <Y>, <Z>)
        +-- Phase wheel (canvas)
