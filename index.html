@@ -125,6 +125,7 @@ body.light-theme::after{background-image:linear-gradient(rgba(13,136,174,0.04) 1
 .gate.T{color:var(--pink);border-color:var(--pink2);}.gate.T:hover{background:var(--pink-dim);}
 .gate.Rx{color:#64ffda;border-color:#00bfa5;}.gate.Rx:hover{background:rgba(100,255,218,0.06);}
 .gate.Ry{color:#ffd54f;border-color:#f9a825;}.gate.Ry:hover{background:rgba(255,213,79,0.06);}
+.gate.Rz{color:#80d8ff;border-color:#40c4ff;}.gate.Rz:hover{background:rgba(128,216,255,0.08);}
 .gate[data-tip]{position:relative;}
 .gate[data-tip]:hover::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 5px);left:50%;transform:translateX(-50%);background:var(--bg2);border:1px solid var(--border2);padding:3px 8px;font-size:7px;color:var(--text);white-space:nowrap;letter-spacing:0.5px;font-family:var(--font-mono);z-index:100;font-weight:normal;box-shadow:0 4px 16px rgba(0,0,0,0.5);}
 
@@ -141,6 +142,7 @@ body.light-theme::after{background-image:linear-gradient(rgba(13,136,174,0.04) 1
 .gate-chip.CNOT-chip{border-color:var(--amber2);color:var(--amber);background:var(--amber-dim);}
 .gate-chip.Rx-chip{border-color:#00bfa5;color:#64ffda;background:rgba(100,255,218,0.06);}
 .gate-chip.Ry-chip{border-color:#f9a825;color:#ffd54f;background:rgba(255,213,79,0.06);}
+.gate-chip.Rz-chip{border-color:#40c4ff;color:#80d8ff;background:rgba(128,216,255,0.08);}
 
 #bloch-mount{width:100%;flex:1;min-height:200px;background:radial-gradient(ellipse at 50% 45%,rgba(0,70,100,0.3),rgba(0,30,50,0.15),var(--bg));border:1px solid var(--border2);position:relative;overflow:hidden;border-radius:var(--radius);}
 #bloch-mount::before{content:'BLOCH_SPHERE_3D';position:absolute;top:5px;left:7px;font-size:7px;color:var(--text3);letter-spacing:2px;font-family:var(--font-main);z-index:5;}
@@ -205,6 +207,14 @@ body.light-theme::after{background-image:linear-gradient(rgba(13,136,174,0.04) 1
 .c-opt.correct{background:rgba(0,230,118,0.15);border-color:var(--green);color:var(--green);box-shadow:0 0 8px rgba(0,230,118,0.15);}
 .c-opt.wrong{background:rgba(255,23,68,0.15);border-color:var(--red);color:var(--red);box-shadow:0 0 8px rgba(255,23,68,0.15);}
 .challenge-score{font-size:7px;color:var(--amber);letter-spacing:1px;font-family:var(--font-main);text-align:right;margin-top:3px;}
+.challenge-explain{display:none;margin-top:5px;padding:5px 6px;border:1px solid var(--amber2);background:var(--bg3);font-size:7px;line-height:1.6;color:var(--text2);}
+.queue-strip{margin-top:4px;padding:4px 6px;border:1px dashed var(--border2);background:var(--bg3);font-size:7px;color:var(--text3);min-height:22px;}
+.queue-strip.active{border-color:var(--cyan3);color:var(--cyan);}
+.queue-list{display:flex;gap:3px;flex-wrap:wrap;margin-top:3px;}
+.analysis-tabs{display:flex;gap:3px;flex-wrap:wrap;}
+.analysis-tab{cursor:pointer;}
+.analysis-panel{display:none;}
+.analysis-panel.active{display:flex;}
 
 #bell-info{display:none;}
 #bell-info .exp-box{border-color:var(--purple2);background:var(--purple-dim);}
@@ -436,6 +446,7 @@ body.light-theme::after{background-image:linear-gradient(rgba(13,136,174,0.04) 1
           <div class="gate T" data-tip="T gate &mdash; &#960;/4 phase" onclick="applyGate('T')">T</div>
           <div class="gate Rx" data-tip="Rx &mdash; X-axis rotation" onclick="showAngleInput('Rx')">Rx</div>
           <div class="gate Ry" data-tip="Ry &mdash; Y-axis rotation" onclick="showAngleInput('Ry')">Ry</div>
+          <div class="gate Rz" data-tip="Rz &mdash; Z-axis rotation / phase rotation" onclick="showAngleInput('Rz')">Rz</div>
         </div>
         <div class="angle-input-wrap" id="angle-wrap">
           <label id="angle-label">Rx(&#952;):</label>
@@ -455,6 +466,8 @@ body.light-theme::after{background-image:linear-gradient(rgba(13,136,174,0.04) 1
           <div class="preset" onclick="loadPreset('superposition')">SUPERPOSITION</div>
           <div class="preset" onclick="loadPreset('bitflip')">BIT_FLIP</div>
           <div class="preset" onclick="loadPreset('phaseflip')">PHASE_FLIP</div>
+          <div class="preset" onclick="loadPreset('minus')">|&minus;&#10217; PREP</div>
+          <div class="preset" onclick="loadPreset('plusi')">|+i&#10217; PREP</div>
           <div class="preset bell" onclick="loadPreset('bell')">BELL STATE &#9733;</div>
           <div class="preset tele" onclick="loadPreset('teleport')">TELEPORT CONCEPT &#8644;</div>
           <div class="preset" onclick="loadPreset('randomwalk')" style="border-color:var(--pink2);color:var(--pink);background:var(--pink-dim);">RANDOM WALK</div>
@@ -463,8 +476,14 @@ body.light-theme::after{background-image:linear-gradient(rgba(13,136,174,0.04) 1
         <div class="section-label">STEP CONTROL</div>
         <div class="btn-row">
           <div class="qbtn" onclick="undoGate()">&#8617; UNDO</div>
-          <div class="qbtn" onclick="multiMeasure()">&#9654; MULTI(100)</div>
+          <div class="qbtn" onclick="multiMeasure()">&#9654; MULTI(1024)</div>
         </div>
+        <div class="btn-row">
+          <div class="qbtn" onclick="toggleQueueMode()" id="queue-toggle">QUEUE [OFF]</div>
+          <div class="qbtn" onclick="stepBackward()">&#8592; STEP</div>
+          <div class="qbtn" onclick="stepForward()">STEP &#8594;</div>
+        </div>
+        <div class="queue-strip" id="queue-strip">STEP_QUEUE: inactive</div>
         <div class="btn-row">
           <div class="export-btn" onclick="exportCircuit()" style="flex:1;text-align:center;">&#8595; EXPORT QASM</div>
           <div class="export-btn" onclick="exportJSON()" style="flex:1;text-align:center;">&#8595; EXPORT JSON</div>
@@ -549,6 +568,7 @@ body.light-theme::after{background-image:linear-gradient(rgba(13,136,174,0.04) 1
             <div class="challenge-q" id="challenge-q">Loading challenge...</div>
             <div class="challenge-opts" id="challenge-opts"></div>
             <div class="challenge-score" id="challenge-score">SCORE: 0/0</div>
+            <div class="challenge-explain" id="challenge-explain"></div>
           </div>
         </div>
       </div>
@@ -558,6 +578,16 @@ body.light-theme::after{background-image:linear-gradient(rgba(13,136,174,0.04) 1
   <!-- RIGHT COLUMN -->
   <div class="col">
     <div class="panel" style="flex:0 0 auto;">
+      <div class="panel-body" style="padding:5px 7px;">
+        <div class="analysis-tabs">
+          <span class="pill pill-cyan analysis-tab active" id="analysis-tab-gate" onclick="setAnalysisPanelTab('gate')">GATE</span>
+          <span class="pill pill-cyan analysis-tab" id="analysis-tab-density" onclick="setAnalysisPanelTab('density')">DENSITY</span>
+          <span class="pill pill-cyan analysis-tab" id="analysis-tab-tomo" onclick="setAnalysisPanelTab('tomo')">TOMOGRAPHY</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel analysis-panel active" id="analysis-panel-gate" style="flex:0 0 auto;">
       <div class="panel-head">
         <span class="panel-title">GATE_PHYSICS</span>
         <span class="pill pill-cyan" style="font-size:7px;" id="gate-badge-r">IDENTITY</span>
@@ -574,7 +604,7 @@ body.light-theme::after{background-image:linear-gradient(rgba(13,136,174,0.04) 1
       </div>
     </div>
 
-    <div class="panel" style="flex:0 0 auto;">
+    <div class="panel analysis-panel" id="analysis-panel-density" style="flex:0 0 auto;">
       <div class="panel-head">
         <span class="panel-title">DENSITY_MATRIX &#961;</span>
         <span class="pill pill-cyan" style="font-size:7px;">LIVE</span>
@@ -587,7 +617,16 @@ body.light-theme::after{background-image:linear-gradient(rgba(13,136,174,0.04) 1
           <div class="density-cell offdiag" id="rho10">0.000</div>
           <div class="density-cell diag" id="rho11">0.000</div>
         </div>
-        <div class="section-label" style="margin-top:3px;">TOMOGRAPHY (&#963; EXPECTATION)</div>
+      </div>
+    </div>
+
+    <div class="panel analysis-panel" id="analysis-panel-tomo" style="flex:0 0 auto;">
+      <div class="panel-head">
+        <span class="panel-title">STATE_TOMOGRAPHY</span>
+        <span class="pill pill-cyan" style="font-size:7px;">LIVE</span>
+      </div>
+      <div class="panel-body" style="padding:5px 7px;">
+        <div class="section-label">TOMOGRAPHY (&#963; EXPECTATION)</div>
         <div class="tomo-bars" id="tomo-bars">
           <div class="tomo-bar-wrap"><div class="tomo-bar" id="tomo-x" style="height:0%;background:var(--red);"></div><div class="tomo-label">&#10216;X&#10217;</div></div>
           <div class="tomo-bar-wrap"><div class="tomo-bar" id="tomo-y" style="height:0%;background:var(--amber);"></div><div class="tomo-label">&#10216;Y&#10217;</div></div>
@@ -725,6 +764,7 @@ const GATE_DEFS={
 
 function makeRx(d){const t=(d*Math.PI/180)/2;return{matrix:[[new Complex(Math.cos(t)),new Complex(0,-Math.sin(t))],[new Complex(0,-Math.sin(t)),new Complex(Math.cos(t))]],label:'Rx('+d+'\u00b0)',matStr:'Rx('+d+'\u00b0)',matVis:[Math.cos(t).toFixed(3),(-Math.sin(t)).toFixed(3)+'i',(-Math.sin(t)).toFixed(3)+'i',Math.cos(t).toFixed(3)],effect:'Rotates '+d+'\u00b0 around X-axis. Continuous rotation.',basis:'X-axis rotation by '+d+'\u00b0.',bloch:d+'\u00b0 rotation about X-axis',qasm:'rx('+(d*Math.PI/180).toFixed(4)+') q[0];'};}
 function makeRy(d){const t=(d*Math.PI/180)/2;return{matrix:[[new Complex(Math.cos(t)),new Complex(-Math.sin(t))],[new Complex(Math.sin(t)),new Complex(Math.cos(t))]],label:'Ry('+d+'\u00b0)',matStr:'Ry('+d+'\u00b0)',matVis:[Math.cos(t).toFixed(3),(-Math.sin(t)).toFixed(3),Math.sin(t).toFixed(3),Math.cos(t).toFixed(3)],effect:'Rotates '+d+'\u00b0 around Y-axis. Real-valued rotation.',basis:'Y-axis rotation by '+d+'\u00b0.',bloch:d+'\u00b0 rotation about Y-axis',qasm:'ry('+(d*Math.PI/180).toFixed(4)+') q[0];'};}
+function makeRz(d){const t=(d*Math.PI/180)/2;return{matrix:[[new Complex(Math.cos(t),-Math.sin(t)),new Complex(0)],[new Complex(0),new Complex(Math.cos(t),Math.sin(t))]],label:'Rz('+d+'\u00b0)',matStr:'Rz('+d+'\u00b0)',matVis:['e^-i\u03b8/2','0','0','e^+i\u03b8/2'],effect:'Rotates '+d+'\u00b0 around Z-axis. Changes relative phase without changing computational-basis probabilities.',basis:'Phase rotation in the computational basis.',bloch:d+'\u00b0 rotation about Z-axis',qasm:'rz('+(d*Math.PI/180).toFixed(4)+') q[0];'};}
 
 // =====================================================
 //  MASTER QUBIT STATE - Single source of truth
@@ -807,7 +847,7 @@ function initAudio(){if(!audioCtx)audioCtx=new(window.AudioContext||window.webki
 function playGateSound(gateName){
   if(!soundEnabled)return;initAudio();
   const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.connect(g);g.connect(audioCtx.destination);
-  const freqs={H:523,X:330,Y:392,Z:440,S:494,T:587,Rx:466,Ry:500};
+  const freqs={H:523,X:330,Y:392,Z:440,S:494,T:587,Rx:466,Ry:500,Rz:540};
   o.frequency.value=freqs[gateName]||466;o.type='sine';
   g.gain.setValueAtTime(0.08,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+0.15);
   o.start();o.stop(audioCtx.currentTime+0.15);
@@ -1130,7 +1170,7 @@ function jumpToStep(idx){
 function updateComplexity(){
   const n=QState.gateHistory.length;
   const weights={H:1,X:1,Y:2,Z:1,S:2,T:3,CNOT:3};
-  let c=0;QState.gateHistory.forEach(g=>{const base=g.startsWith('Rx')||g.startsWith('Ry')?2:(weights[g]||1);c+=base;});
+  let c=0;QState.gateHistory.forEach(g=>{const base=g.startsWith('Rx')||g.startsWith('Ry')||g.startsWith('Rz')?2:(weights[g]||1);c+=base;});
   const pct=Math.min(100,c*5);
   document.getElementById('complexity-fill').style.width=pct+'%';
   document.getElementById('complexity-fill').style.background=pct<30?'var(--green)':pct<70?'var(--amber)':'var(--red)';
@@ -1189,7 +1229,7 @@ function updateCircuit(){
   w.innerHTML='<span class="wire-init">|0\u27e9 \u2014</span>';
   QState.gateHistory.forEach(g=>{
     const c=document.createElement('span');
-    const bn=g.startsWith('Rx')?'Rx':g.startsWith('Ry')?'Ry':g;
+    const bn=g.startsWith('Rx')?'Rx':g.startsWith('Ry')?'Ry':g.startsWith('Rz')?'Rz':g;
     c.className='gate-chip '+bn+'-chip';c.textContent=g;w.appendChild(c);
   });
   const e=document.createElement('span');e.className='wire-end';e.textContent='\u2014 |\u03c8\u27e9';w.appendChild(e);
@@ -1198,36 +1238,79 @@ function updateCircuit(){
 // =====================================================
 //  GATE APPLICATION
 // =====================================================
-window.applyGate=function(gateName){
-  hideDemoHint();
-  if(QState.measured)resetState();
+let pendingAngleGate='Rx',queueMode=false;
+const queuedOperations=[];
+
+function updateQueueStrip(){
+  const el=document.getElementById('queue-strip');if(!el)return;
+  el.classList.toggle('active',queueMode);
+  if(!queueMode){el.textContent='STEP_QUEUE: inactive';return;}
+  el.innerHTML='STEP_QUEUE: '+(queuedOperations.length?'<div class="queue-list">'+queuedOperations.map(op=>'<span class="gate-chip '+op.chipClass+'-chip">'+op.label+'</span>').join('')+'</div>':'waiting for queued gates…');
+}
+
+function clearBellDisplay(){
   QState.bellMode=false;
   document.getElementById('bell-info').style.display='none';
   document.getElementById('bell-spheres').classList.remove('active');
   document.getElementById('bell-corr').style.display='none';
-  const gate=GATE_DEFS[gateName];if(!gate)return;
-  QState.applyMatrix(gate);
-  QState.gateHistory.push(gateName);QState.gateDefHistory.push(gate);QState.gatesApplied++;
-  QState.saveSnapshot(gateName);
-  updateAllUI();updateGatePhysics(gate);updateCircuit();
-  addLog('GATE_APPLIED: '+gateName,'warn');
+}
+
+function executeGateOperation(op){
+  hideDemoHint();
+  if(QState.measured)resetState();
+  clearBellDisplay();
+  QState.applyMatrix(op.gate);
+  QState.gateHistory.push(op.label);QState.gateDefHistory.push(op.gate);QState.gatesApplied++;
+  QState.saveSnapshot(op.label);
+  updateAllUI();updateGatePhysics(op.gate);updateCircuit();
+  addLog('GATE_APPLIED: '+op.label,'warn');
   addLog('\u03b1='+QState.alpha.toString(3)+'  \u03b2='+QState.beta.toString(3),'info');
-  flashOverlay('cyan');playGateSound(gateName);
+  flashOverlay('cyan');playGateSound(op.soundKey);
+}
+
+function queueGateOperation(op){
+  queuedOperations.push(op);
+  updateQueueStrip();
+  addLog('STEP_QUEUE += '+op.label,'info');
+}
+
+window.applyGate=function(gateName){
+  const gate=GATE_DEFS[gateName];if(!gate)return;
+  const op={label:gateName,gate,soundKey:gateName,chipClass:gateName};
+  if(queueMode){queueGateOperation(op);return;}
+  executeGateOperation(op);
 };
 
-let pendingAngleGate='Rx';
 window.showAngleInput=function(type){pendingAngleGate=type;document.getElementById('angle-wrap').classList.add('show');document.getElementById('angle-label').textContent=type+'(\u03b8):';document.getElementById('angle-val').focus();};
 window.applyAngleGate=function(){
   hideDemoHint();
   const deg=parseFloat(document.getElementById('angle-val').value)||90;
-  const gate=pendingAngleGate==='Rx'?makeRx(deg):makeRy(deg);
+  const gate=pendingAngleGate==='Rx'?makeRx(deg):pendingAngleGate==='Ry'?makeRy(deg):makeRz(deg);
   document.getElementById('angle-wrap').classList.remove('show');
-  if(QState.measured)resetState();
-  QState.bellMode=false;document.getElementById('bell-info').style.display='none';document.getElementById('bell-spheres').classList.remove('active');document.getElementById('bell-corr').style.display='none';
-  QState.applyMatrix(gate);QState.gateHistory.push(gate.label);QState.gateDefHistory.push(gate);QState.gatesApplied++;
-  QState.saveSnapshot(gate.label);
-  updateAllUI();updateGatePhysics(gate);updateCircuit();
-  addLog('GATE_APPLIED: '+gate.label,'warn');flashOverlay('cyan');playGateSound(pendingAngleGate);
+  const op={label:gate.label,gate,soundKey:pendingAngleGate,chipClass:pendingAngleGate};
+  if(queueMode){queueGateOperation(op);return;}
+  executeGateOperation(op);
+};
+
+window.toggleQueueMode=function(){
+  queueMode=!queueMode;
+  if(!queueMode)queuedOperations.length=0;
+  document.getElementById('queue-toggle').textContent=queueMode?'QUEUE [ON]':'QUEUE [OFF]';
+  updateQueueStrip();
+  addLog('STEP_QUEUE_MODE: '+(queueMode?'ON \u2014 use \u2190/\u2192 to step':'OFF'),'sys');
+};
+
+window.stepForward=function(){
+  if(!queueMode){addLog('STEP_FORWARD: Enable queue mode first','warn');return;}
+  const next=queuedOperations.shift();
+  if(!next){updateQueueStrip();addLog('STEP_FORWARD: Queue empty','warn');return;}
+  updateQueueStrip();
+  executeGateOperation(next);
+};
+
+window.stepBackward=function(){
+  if(QState.gateHistory.length===0){addLog('STEP_BACKWARD: No applied gate to rewind','warn');return;}
+  undoGate();
 };
 
 // =====================================================
@@ -1235,7 +1318,7 @@ window.applyAngleGate=function(){
 // =====================================================
 window.measure=function(){
   hideDemoHint();
-  if(QState.measured)return;
+  if(QState.measured){addLog('MEASUREMENT_BLOCKED: state already collapsed','warn');return;}
   const p0=QState.p0,rand=Math.random(),result=rand<p0?0:1;
   addLog('MEASUREMENT_INITIATED \u2014 rand='+rand.toFixed(4)+' p0='+p0.toFixed(4),'sys');
   flashOverlay('red');playCollapseSound();
@@ -1256,10 +1339,10 @@ window.measure=function(){
 window.multiMeasure=function(){
   if(QState.measured){addLog('MULTI_MEASURE: Reset first','warn');return;}
   const p0=QState.p0,sa=QState.alpha.clone(),sb=QState.beta.clone();
-  let c0=0,c1=0;for(let i=0;i<100;i++){if(Math.random()<p0)c0++;else c1++;}
-  QState.histogram[0]+=c0;QState.histogram[1]+=c1;QState.measureCount+=100;
+  let c0=0,c1=0;for(let i=0;i<1024;i++){if(Math.random()<p0)c0++;else c1++;}
+  QState.histogram[0]+=c0;QState.histogram[1]+=c1;QState.measureCount+=1024;
   QState.alpha=sa;QState.beta=sb;
-  updateAllUI();addLog('MULTI_MEASURE(100): |0\u27e9='+c0+' |1\u27e9='+c1,'ok');flashOverlay('cyan');
+  updateAllUI();addLog('MULTI_MEASURE(1024): |0\u27e9='+c0+' |1\u27e9='+c1,'ok');flashOverlay('cyan');
 };
 
 function flashOverlay(color){
@@ -1274,6 +1357,7 @@ function flashOverlay(color){
 window.resetState=function(){
   hideDemoHint();
   QState.reset();stopDecoherence();
+  queueMode=false;queuedOperations.length=0;document.getElementById('queue-toggle').textContent='QUEUE [OFF]';updateQueueStrip();
   document.getElementById('bell-info').style.display='none';
   document.getElementById('bell-spheres').classList.remove('active');
   document.getElementById('bell-corr').style.display='none';
@@ -1303,6 +1387,8 @@ window.loadPreset=function(name){
   if(name==='superposition'){applyGate('H');addLog('PRESET: SUPERPOSITION','ok');}
   else if(name==='bitflip'){applyGate('X');addLog('PRESET: BIT_FLIP','ok');}
   else if(name==='phaseflip'){applyGate('H');applyGate('Z');addLog('PRESET: PHASE_FLIP','ok');}
+  else if(name==='minus'){applyGate('H');applyGate('Z');addLog('PRESET: |-\u27e9 PREP','ok');}
+  else if(name==='plusi'){applyGate('H');applyGate('S');addLog('PRESET: |+i\u27e9 PREP','ok');}
   else if(name==='bell'){
     applyGate('H');
     QState.bellMode=true;
@@ -1605,6 +1691,16 @@ function setBellCollapse(result){
   });
 }
 
+window.setAnalysisPanelTab=function(tab){
+  ['gate','density','tomo'].forEach(name=>{
+    const pill=document.getElementById('analysis-tab-'+name);
+    const panel=document.getElementById('analysis-panel-'+name);
+    if(pill)pill.classList.toggle('active',name===tab);
+    if(panel)panel.classList.toggle('active',name===tab);
+  });
+  addLog('ANALYSIS_TAB: '+tab.toUpperCase(),'sys');
+};
+
 window.runWinningDemo=function(){
   hideDemoHint();
   resetState();
@@ -1623,11 +1719,11 @@ window.runWinningDemo=function(){
 
 function addLog(msg,type){
   const el=document.getElementById('syslog');const now=new Date();
-  const ts='['+pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds())+']';
+  const ts='['+pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds())+'.'+String(now.getMilliseconds()).padStart(3,'0')+']';
   const line=document.createElement('div');line.className='log-line';
   line.innerHTML='<span class="log-time">'+ts+'</span><span class="log-'+type+'">\u203a '+msg+'</span>';
   el.appendChild(line);el.scrollTop=el.scrollHeight;
-  while(el.children.length>150)el.removeChild(el.firstChild);
+  while(el.children.length>100)el.removeChild(el.firstChild);
 }
 function pad(n){return String(n).padStart(2,'0');}
 
@@ -1704,6 +1800,22 @@ const CHALLENGES=[
 ];
 let challengeActive=false,currentChallenge=null,challengeIdx=0,challengeScore=0,challengeTotal=0;
 
+function getChallengeExplanation(ch){
+  const explanations={
+    'After H on |0⟩, P(|0⟩)?':'Hadamard prepares |+⟩ = (|0⟩+|1⟩)/√2, so both computational-basis outcomes are equally likely.',
+    'X on |0⟩ produces?':'Pauli-X swaps |0⟩ and |1⟩, so it sends the north pole directly to the south pole.',
+    'Z gate affects which quantity?':'Pauli-Z preserves populations in the computational basis and flips only the relative phase between |0⟩ and |1⟩.',
+    'H→H on |0⟩. Final?':'Hadamard is its own inverse, so applying it twice returns the qubit to |0⟩.',
+    'S changes which Bloch angle?':'S is a quarter-turn around Z, so it changes the azimuthal phase angle φ while leaving θ unchanged.',
+    'Entropy of |0⟩?':'A pure basis state has zero von Neumann entropy because its outcome is fully predictable.',
+    'Y on |0⟩ gives?':'Pauli-Y maps |0⟩ to i|1⟩, adding a phase factor while flipping the computational basis value.',
+    'After X, Bloch vector?':'Pauli-X sends |0⟩ to |1⟩, so the Bloch vector moves from the north pole to the south pole.',
+    'T gate phase angle?':'The T gate is a π/4 phase rotation, the standard “eighth-turn” around Z.',
+    'Bell |Φ⁺⟩ correlation?':'|Φ⁺⟩ = (|00⟩+|11⟩)/√2 always yields matching outcomes when both qubits are measured in the same basis.'
+  };
+  return ch.explain||explanations[ch.q]||('Correct answer: '+ch.opts[ch.answer]+'. This follows from the gate\'s action on amplitudes and Bloch-sphere geometry.');
+}
+
 window.toggleChallenge=function(){
   challengeActive=!challengeActive;
   document.getElementById('challenge-panel').style.display=challengeActive?'block':'none';
@@ -1714,6 +1826,7 @@ function loadChallenge(){
   currentChallenge=CHALLENGES[challengeIdx%CHALLENGES.length];
   document.getElementById('challenge-q').textContent='\u26a1 '+currentChallenge.q;
   document.getElementById('challenge-score').textContent='SCORE: '+challengeScore+'/'+challengeTotal;
+  const explain=document.getElementById('challenge-explain');explain.style.display='none';explain.textContent='';
   const el=document.getElementById('challenge-opts');el.innerHTML='';
   currentChallenge.opts.forEach((o,i)=>{const b=document.createElement('div');b.className='c-opt';b.textContent=o;b.onclick=()=>checkAnswer(i);el.appendChild(b);});
 }
@@ -1723,9 +1836,19 @@ function checkAnswer(idx){
   if(idx===currentChallenge.answer){challengeScore++;addLog('CHALLENGE_CORRECT \u2713 '+challengeScore+'/'+challengeTotal,'ok');playSuccessSound();}
   else addLog('INCORRECT \u2014 was: '+currentChallenge.opts[currentChallenge.answer],'err');
   document.getElementById('challenge-score').textContent='SCORE: '+challengeScore+'/'+challengeTotal;
-  setTimeout(()=>{challengeIdx++;loadChallenge();},2000);
+  const explain=document.getElementById('challenge-explain');
+  explain.textContent=getChallengeExplanation(currentChallenge);
+  explain.style.display='block';
+  setTimeout(()=>{challengeIdx++;loadChallenge();},2800);
 }
-function revealChallenge(r){addLog('MEASURE='+r+' \u2014 verify prediction','sys');}
+function revealChallenge(r){
+  addLog('MEASURE='+r+' \u2014 verify prediction','sys');
+  const explain=document.getElementById('challenge-explain');
+  if(explain&&currentChallenge&&challengeActive){
+    explain.textContent='Observed outcome |'+r+'\u27e9. Compare it with the challenge prompt and the Born-rule probabilities shown in the center panel.';
+    explain.style.display='block';
+  }
+}
 
 // =====================================================
 //  CLOCK / KEYS / RESIZE / INIT
@@ -1741,6 +1864,11 @@ setInterval(updateClock,1000);
 
 document.addEventListener('keydown',e=>{
   if(e.target.tagName==='INPUT')return;const k=e.key.toUpperCase();
+  if(e.key==='ArrowRight'){e.preventDefault();stepForward();return;}
+  if(e.key==='ArrowLeft'){e.preventDefault();stepBackward();return;}
+  if(e.key==='F1'){e.preventDefault();setAnalysisPanelTab('gate');return;}
+  if(e.key==='F2'){e.preventDefault();setAnalysisPanelTab('density');return;}
+  if(e.key==='F4'){e.preventDefault();setAnalysisPanelTab('tomo');return;}
   if(k==='H')applyGate('H');else if(k==='X')applyGate('X');else if(k==='Y')applyGate('Y');
   else if(k==='Z')applyGate('Z');else if(k==='S'&&!e.ctrlKey)applyGate('S');
   else if(k==='T'&&!e.ctrlKey)applyGate('T');else if(k==='M')measure();
