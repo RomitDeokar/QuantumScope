@@ -853,7 +853,12 @@ function initParticles(){
   }
   draw();
 }
-function hideDemoHint(){const hint=document.getElementById('demo-hint');if(hint)hint.style.display='none';}
+function hideDemoHint(){
+  const hint=document.getElementById('demo-hint');
+  if(hint)hint.style.display='none';
+  const layout=document.querySelector('.layout');
+  if(layout){layout.style.marginTop='';layout.style.height='';}
+}
 
 // =====================================================
 //  UI UPDATE ENGINE
@@ -1783,6 +1788,14 @@ window.addEventListener('load',()=>{
     [2200,'\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501','sys'],
   ];
   boot.forEach(([t,m,c])=>setTimeout(()=>addLog(m,c),t));
+  setTimeout(()=>{
+    const hint=document.getElementById('demo-hint');
+    const layout=document.querySelector('.layout');
+    if(hint&&hint.style.display!=='none'&&layout){
+      layout.style.marginTop='26px';
+      layout.style.height='calc(100vh - 72px)';
+    }
+  },100);
   // Show tutorial on first visit
   if(!localStorage.getItem('qs_tutorial_seen')){
     setTimeout(()=>{showTutorial();},2500);
