@@ -429,7 +429,7 @@ body.light-theme::after{background-image:linear-gradient(rgba(13,136,174,0.04) 1
         <div class="section-label">QUANTUM GATES</div>
         <div class="gates-grid">
           <div class="gate H" data-tip="Hadamard &mdash; superposition" onclick="applyGate('H')">H</div>
-          <div class="gate X" data-tip="Pauli-X &mdash; bit flip" onclick="applyGate('X')">X</div>
+          <div class="gate X" data-tip="Pauli-X &mdash; bit flip &rarr; south pole |1&#10217;, NOT +X axis" onclick="applyGate('X')">X</div>
           <div class="gate Y" data-tip="Pauli-Y &mdash; bit+phase" onclick="applyGate('Y')">Y</div>
           <div class="gate Z" data-tip="Pauli-Z &mdash; phase flip" onclick="applyGate('Z')">Z</div>
           <div class="gate S" data-tip="S gate &mdash; &#960;/2 phase" onclick="applyGate('S')">S</div>
@@ -456,7 +456,7 @@ body.light-theme::after{background-image:linear-gradient(rgba(13,136,174,0.04) 1
           <div class="preset" onclick="loadPreset('bitflip')">BIT_FLIP</div>
           <div class="preset" onclick="loadPreset('phaseflip')">PHASE_FLIP</div>
           <div class="preset bell" onclick="loadPreset('bell')">BELL STATE &#9733;</div>
-          <div class="preset tele" onclick="loadPreset('teleport')">TELEPORT &#8644;</div>
+          <div class="preset tele" onclick="loadPreset('teleport')">TELEPORT CONCEPT &#8644;</div>
           <div class="preset" onclick="loadPreset('randomwalk')" style="border-color:var(--pink2);color:var(--pink);background:var(--pink-dim);">RANDOM WALK</div>
         </div>
         <div class="divider"></div>
@@ -539,7 +539,8 @@ body.light-theme::after{background-image:linear-gradient(rgba(13,136,174,0.04) 1
           <div class="exp-box" style="border-color:var(--purple2);background:var(--purple-dim);">
             <div class="exp-lbl" style="color:var(--purple);">ENTANGLEMENT_STATE</div>
             <span style="color:var(--purple);">|&#934;&#8314;&#10217; = (|00&#10217; + |11&#10217;) / &#8730;2</span><br/>
-            <span style="color:var(--text2);font-size:8px;">Measuring qubit A instantly determines qubit B. Einstein called this "spooky action at a distance."</span>
+            <span style="color:var(--text2);font-size:8px;">Measuring qubit A instantly determines qubit B. Einstein called this "spooky action at a distance."</span><br/>
+            <span style="color:var(--text3);font-size:7px;letter-spacing:0.5px;">Visualization: reduced density matrix &#961;<sub>A</sub> = Tr<sub>B</sub>(|&#934;&#8314;&#10217;&#10216;&#934;&#8314;|) = I/2. Full state &#8712; &#8450;&#8308;.</span>
           </div>
         </div>
 
@@ -630,8 +631,8 @@ body.light-theme::after{background-image:linear-gradient(rgba(13,136,174,0.04) 1
 
     <div class="panel" style="flex:0 0 auto;">
       <div class="panel-head">
-        <span class="panel-title">STATE_INTERPRETATION</span>
-        <span class="pill pill-green" style="font-size:7px;">PHYSICS ENGINE</span>
+        <span class="panel-title">STATE_ANALYSIS</span>
+        <span class="pill pill-green" style="font-size:7px;">STATE ANALYSIS</span>
       </div>
       <div class="panel-body">
         <div class="exp-box" id="ai-explain-box" style="color:var(--text2);min-height:36px;max-height:120px;overflow-y:auto;">Click EXPLAIN_STATE for physics interpretation of the current qubit state.</div>
@@ -732,6 +733,7 @@ const QState={
   alpha:new Complex(1,0), beta:new Complex(0,0),
   gateHistory:[], gateDefHistory:[], measured:false, collapsedTo:null,
   bellMode:false, gatesApplied:0, measureCount:0, histogram:{0:0,1:0},
+  trackedPurity:1.0,
   // State snapshots for time-travel
   snapshots:[{alpha:new Complex(1,0),beta:new Complex(0,0),label:'init'}],
 
@@ -749,7 +751,7 @@ const QState={
   get rho01(){return this.alpha.mul(this.beta.conj());},
   get rho10(){return this.beta.mul(this.alpha.conj());},
   get rho11(){return this.beta.mul(this.beta.conj());},
-  get purity(){const r=this.rho00;return r.abs2()+2*this.rho01.abs2()+this.rho11.abs2();},
+  get purity(){return this.trackedPurity;},
 
   applyMatrix(gate){
     const m=gate.matrix;
@@ -775,12 +777,27 @@ const QState={
     this.alpha=new Complex(1,0);this.beta=new Complex(0,0);
     this.gateHistory=[];this.gateDefHistory=[];this.measured=false;
     this.collapsedTo=null;this.bellMode=false;this.histogram={0:0,1:0};
-    this.gatesApplied=0;this.measureCount=0;
+    this.gatesApplied=0;this.measureCount=0;this.trackedPurity=1.0;
     this.snapshots=[{alpha:new Complex(1,0),beta:new Complex(0,0),label:'init'}];
     QECState.logical=0;QECState.errorIndex=-1;QECState.bits=[0,0,0];
   }
 };
 const QECState={logical:0,errorIndex:-1,bits:[0,0,0]};
+
+function getDisplayDecay(){return decoherenceActive?decoherenceDecay:1.0;}
+function getDisplayRho01(){return QState.rho01.scale(getDisplayDecay());}
+function getDisplayRho10(){return QState.rho10.scale(getDisplayDecay());}
+function getDisplayBlochX(){return QState.blochX*getDisplayDecay();}
+function getDisplayBlochY(){return QState.blochY*getDisplayDecay();}
+function getDisplayBlochZ(){return QState.blochZ;}
+function getDisplayTheta(){
+  return Math.acos(Math.max(-1,Math.min(1,getDisplayBlochZ())));
+}
+function getDisplayPhi(){
+  const bx=getDisplayBlochX(),by=getDisplayBlochY();
+  if(Math.abs(bx)<1e-8&&Math.abs(by)<1e-8)return 0;
+  return Math.atan2(by,bx);
+}
 
 // =====================================================
 //  SOUND ENGINE
@@ -875,14 +892,15 @@ function updateAllUI(){
   document.getElementById('bar1').style.width=p1.toFixed(1)+'%';
   document.getElementById('pct0').textContent=p0.toFixed(1)+'%';
   document.getElementById('pct1').textContent=p1.toFixed(1)+'%';
-  const tD=(QState.theta*180/Math.PI).toFixed(1),pD=(QState.phi*180/Math.PI).toFixed(1);
+  const displayTheta=getDisplayTheta(),displayPhi=getDisplayPhi();
+  const tD=(displayTheta*180/Math.PI).toFixed(1),pD=(displayPhi*180/Math.PI).toFixed(1);
   document.getElementById('val-theta').textContent=tD+'\u00b0';
   document.getElementById('val-phi').textContent=pD+'\u00b0';
   document.getElementById('bloch-theta').textContent=tD+'\u00b0';
   document.getElementById('bloch-phi').textContent=pD+'\u00b0';
-  document.getElementById('bloch-x').textContent=QState.blochX.toFixed(2);
-  document.getElementById('bloch-y').textContent=QState.blochY.toFixed(2);
-  document.getElementById('bloch-z').textContent=QState.blochZ.toFixed(2);
+  document.getElementById('bloch-x').textContent=getDisplayBlochX().toFixed(2);
+  document.getElementById('bloch-y').textContent=getDisplayBlochY().toFixed(2);
+  document.getElementById('bloch-z').textContent=getDisplayBlochZ().toFixed(2);
   let stateLabel='',stateBadge='';
   if(QState.measured){stateLabel='COLLAPSED \u2192 |'+QState.collapsedTo+'\u27e9';stateBadge='COLLAPSED |'+QState.collapsedTo+'\u27e9';}
   else if(p0>99.9){stateLabel='GROUND STATE';stateBadge='|0\u27e9 GROUND';}
@@ -911,20 +929,21 @@ function updateAllUI(){
 
 function updateDensityMatrix(){
   const fmt=c=>c.abs()<0.001?'0':c.toString(2);
+  const rho01=getDisplayRho01(),rho10=getDisplayRho10();
   document.getElementById('rho00').textContent=QState.rho00.re.toFixed(3);
-  document.getElementById('rho01').textContent=fmt(QState.rho01);
-  document.getElementById('rho10').textContent=fmt(QState.rho10);
+  document.getElementById('rho01').textContent=fmt(rho01);
+  document.getElementById('rho10').textContent=fmt(rho10);
   document.getElementById('rho11').textContent=QState.rho11.re.toFixed(3);
   const d00=document.getElementById('rho00'),d11=document.getElementById('rho11');
   d00.style.background='rgba(0,230,118,'+QState.rho00.re*0.12+')';
   d11.style.background='rgba(0,230,118,'+QState.rho11.re*0.12+')';
-  const coh=QState.rho01.abs();
+  const coh=rho01.abs();
   document.getElementById('rho01').style.background='rgba(0,229,255,'+coh*0.2+')';
   document.getElementById('rho10').style.background='rgba(0,229,255,'+coh*0.2+')';
 }
 
 function updateTomography(){
-  const bx=QState.blochX,by=QState.blochY,bz=QState.blochZ;
+  const bx=getDisplayBlochX(),by=getDisplayBlochY(),bz=getDisplayBlochZ();
   const setBar=(id,val,pos,neg)=>{const el=document.getElementById(id);el.style.height=Math.abs(val)*100+'%';el.style.background=val>=0?pos:neg;};
   setBar('tomo-x',bx,'var(--red)','rgba(255,23,68,0.3)');
   setBar('tomo-y',by,'var(--amber)','rgba(255,171,0,0.3)');
@@ -934,6 +953,7 @@ function updateTomography(){
 function updatePhaseWheel(){
   const c=document.getElementById('phase-canvas');if(!c)return;
   const ctx=c.getContext('2d'),cx=28,cy=28,r=22;
+  const phaseDecay=getDisplayDecay();
   ctx.clearRect(0,0,56,56);
   ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.strokeStyle='rgba(0,229,255,0.2)';ctx.lineWidth=1;ctx.stroke();
   // Alpha phase
@@ -945,14 +965,14 @@ function updatePhaseWheel(){
   if(QState.beta.abs()>0.01){
     const pb=QState.beta.phase();
     ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+Math.cos(pb)*r*0.7,cy-Math.sin(pb)*r*0.7);
-    ctx.strokeStyle='#ffab00';ctx.lineWidth=1.5;ctx.stroke();
+    ctx.strokeStyle='rgba(255,171,0,'+(0.2+0.8*phaseDecay)+')';ctx.lineWidth=1.5;ctx.stroke();
     ctx.beginPath();ctx.arc(cx+Math.cos(pb)*r*0.7,cy-Math.sin(pb)*r*0.7,2,0,Math.PI*2);ctx.fillStyle='#ffab00';ctx.fill();
   }
   // Relative phase arc
   if(QState.beta.abs()>0.01){
     const rel=(QState.beta.phase()-QState.alpha.phase());
     ctx.beginPath();ctx.arc(cx,cy,r*0.5,-QState.alpha.phase(),-QState.alpha.phase()-rel,rel>0);
-    ctx.strokeStyle='rgba(179,136,255,0.5)';ctx.lineWidth=1.5;ctx.stroke();
+    ctx.strokeStyle='rgba(179,136,255,'+(0.12+0.38*phaseDecay)+')';ctx.lineWidth=1.5;ctx.stroke();
   }
   // Center dot
   ctx.beginPath();ctx.arc(cx,cy,1.5,0,Math.PI*2);ctx.fillStyle='rgba(0,229,255,0.5)';ctx.fill();
@@ -965,10 +985,9 @@ function updateWigner(){
   const c=document.getElementById('wigner-canvas');if(!c)return;
   const ctx=c.getContext('2d'),W=72,H=72,N=18;
   ctx.clearRect(0,0,W,H);
-  const a=QState.alpha,b=QState.beta;
   // Bloch-sphere projection on a theta-phi grid
   // W(theta,phi) = 1/(4pi) * (1 + r.n) where n is the Bloch point
-  const bx=QState.blochX,by=QState.blochY,bz=QState.blochZ;
+  const bx=getDisplayBlochX(),by=getDisplayBlochY(),bz=getDisplayBlochZ();
   for(let i=0;i<N;i++){
     for(let j=0;j<N;j++){
       const theta=(i/N)*Math.PI,phi=(j/N)*2*Math.PI;
@@ -1119,7 +1138,7 @@ function updateComplexity(){
 }
 
 function updateArrowInspector(){
-  const bx=QState.blochX,by=QState.blochY,bz=QState.blochZ;
+  const bx=getDisplayBlochX(),by=getDisplayBlochY(),bz=getDisplayBlochZ();
   const absVals=[['X',Math.abs(bx)],['Y',Math.abs(by)],['Z',Math.abs(bz)]].sort((a,b)=>b[1]-a[1]);
   const axis=absVals[0][0];
   const raw=axis==='X' ? bx : (axis==='Y' ? by : bz);
@@ -1287,7 +1306,7 @@ window.loadPreset=function(name){
   else if(name==='bell'){
     applyGate('H');
     QState.bellMode=true;
-    QState.gateHistory.push('CNOT');updateCircuit();
+    QState.gateHistory.push('CNOT');QState.gatesApplied++;updateCircuit();
     document.getElementById('bell-info').style.display='block';document.getElementById('bell-spheres').classList.add('active');document.getElementById('bell-corr').style.display='block';
     document.getElementById('bell-corr').innerHTML='&#10216;&#968;| CORRELATION: MAXIMALLY ENTANGLED &mdash; IDENTICAL OUTCOMES &#10217;';
     updateAllUI();
@@ -1304,7 +1323,7 @@ window.loadPreset=function(name){
   else if(name==='teleport'){
     addLog('TELEPORTATION PROTOCOL INITIATED','sys');
     applyGate('H');applyGate('Z');applyGate('H');
-    QState.gateHistory.push('CNOT');QState.gateHistory.push('H');QState.gateHistory.push('M\u2192');updateCircuit();
+    QState.gateHistory.push('CNOT');QState.gateHistory.push('H');QState.gateHistory.push('M\u2192');QState.gatesApplied+=3;updateCircuit();
     addLog('STATE TELEPORTED: |\u03c8\u27e9 \u2192 |0\u27e9 via EPR channel','sys');
     addLog('Classical bits sent: 2 | Quantum channel: Bell pair consumed','info');
     updateGatePhysics({label:'TELEPORTATION',matStr:'M(H\u2297I)\u00b7CNOT\u00b7(|\u03c8\u27e9\u2297|\u03a6\u207a\u27e9)',matVis:['1','0','0','0','0','1','0','0','0','0','0','1','0','0','1','0'],effect:'Quantum teleportation protocol. Transfers quantum state using entanglement + 2 classical bits. Original state destroyed (no-cloning theorem).',basis:'Bell measurement on qubits 1&2, corrections on qubit 3.',bloch:'State faithfully reconstructed at remote location'});
@@ -1344,23 +1363,21 @@ window.exportJSON=function(){
 // =====================================================
 //  DECOHERENCE SIMULATOR
 // =====================================================
-let decoherenceActive=false,decoherenceInterval=null,decoherenceLevel=0;
+let decoherenceActive=false,decoherenceInterval=null,decoherenceLevel=0,decoherenceDecay=1.0;
 
 window.toggleDecoherence=function(){
   if(decoherenceActive){stopDecoherence();addLog('DECOHERENCE HALTED','ok');}
   else{startDecoherence();addLog('DECOHERENCE SIMULATION ACTIVE \u2014 T2 decay','warn');}
 };
 function startDecoherence(){
-  decoherenceActive=true;decoherenceLevel=0;
+  decoherenceActive=true;decoherenceLevel=0;decoherenceDecay=1.0;QState.trackedPurity=1.0;
   document.getElementById('deco-toggle').textContent='STOP DECOHERENCE';
   document.getElementById('deco-badge').textContent='DECAYING';document.getElementById('deco-badge').className='pill pill-red';
   decoherenceInterval=setInterval(()=>{
     if(QState.measured||decoherenceLevel>=100){stopDecoherence();return;}
     decoherenceLevel+=2;
-    // Apply small random rotation (T2 dephasing)
-    const noise=0.02;
-    const nr=new Complex(Math.cos(noise*(Math.random()-0.5)),Math.sin(noise*(Math.random()-0.5)));
-    QState.beta=QState.beta.mul(nr);QState.normalize();
+    decoherenceDecay=Math.exp(-0.03*decoherenceLevel);
+    QState.trackedPurity=0.5+0.5*decoherenceDecay;
     document.getElementById('deco-fill').style.width=decoherenceLevel+'%';
     document.getElementById('deco-pct').textContent=decoherenceLevel+'%';
     document.getElementById('deco-label').textContent=decoherenceLevel<30?'COHERENT':decoherenceLevel<70?'DEPHASING':'DECOHERED';
@@ -1369,7 +1386,7 @@ function startDecoherence(){
 }
 function stopDecoherence(){
   decoherenceActive=false;if(decoherenceInterval)clearInterval(decoherenceInterval);decoherenceInterval=null;
-  decoherenceLevel=0;
+  decoherenceLevel=0;decoherenceDecay=1.0;QState.trackedPurity=1.0;
   document.getElementById('deco-toggle').textContent='START DECOHERENCE';
   document.getElementById('deco-badge').textContent='T2=∞';document.getElementById('deco-badge').className='pill pill-amber';
   document.getElementById('deco-badge').style.fontSize='7px';
@@ -1508,7 +1525,7 @@ function updateArrowFromBloch(bx,by,bz){
   }
 }
 
-function animateBlochTarget(){targetBX=QState.blochX;targetBY=QState.blochY;targetBZ=QState.blochZ;}
+function animateBlochTarget(){targetBX=getDisplayBlochX();targetBY=getDisplayBlochY();targetBZ=getDisplayBlochZ();}
 
 function vibrateBloch(cb){
   isVibrating=true;let t=0;const ox=targetBX,oy=targetBY,oz=targetBZ;
@@ -1620,11 +1637,11 @@ function pad(n){return String(n).padStart(2,'0');}
 window.explainState=function(){
   const box=document.getElementById('ai-explain-box');
   const p0=QState.p0,p1=QState.p1;
-  const tD=(QState.theta*180/Math.PI).toFixed(1),pD=(QState.phi*180/Math.PI).toFixed(1);
+  const tD=(getDisplayTheta()*180/Math.PI).toFixed(1),pD=(getDisplayPhi()*180/Math.PI).toFixed(1);
   const gates=QState.gateHistory.join(' \u2192 ')||'None';
   let basis,physics,measurement;
-  if(QState.bellMode){basis='Entangled Bell state |\u03a6\u207a\u27e9 \u2014 two-qubit system.';physics='H+CNOT created (|00\u27e9+|11\u27e9)/\u221a2 \u2014 maximally entangled.';measurement='Measuring either qubit collapses BOTH. 50/50 but always correlated.';}
-  else if(QState.measured){basis='Collapsed |'+QState.collapsedTo+'\u27e9 \u2014 no superposition.';physics='Measurement destroyed superposition. Wavefunction collapsed irreversibly.';measurement='Will yield |'+QState.collapsedTo+'\u27e9 with 100% certainty.';}
+  if(QState.measured){basis='Collapsed |'+QState.collapsedTo+'\u27e9 \u2014 no superposition.';physics=QState.bellMode?'Bell-pair measurement projected the full two-qubit state onto correlated outcomes. The single-qubit view now shows the measured branch.':'Measurement destroyed superposition. Wavefunction collapsed irreversibly.';measurement='Will yield |'+QState.collapsedTo+'\u27e9 with 100% certainty.';}
+  else if(QState.bellMode){basis='Entangled Bell state |\u03a6\u207a\u27e9 \u2014 displayed here as qubit A\u2019s reduced state after tracing out qubit B.';physics='H+CNOT created (|00\u27e9+|11\u27e9)/\u221a2 in a four-dimensional Hilbert space. The single-qubit panel therefore shows \u03c1_A = I/2 rather than the full two-qubit wavefunction.';measurement='Measuring either qubit collapses BOTH. Outcomes stay 50/50 overall, but the pair is perfectly correlated.';}
   else if(p0>0.999){basis='Ground state |0\u27e9 \u2014 north pole (\u03b8=0\u00b0).';physics=gates==='None'?'No gates. Computational basis ground state.':'['+gates+'] returned qubit to |0\u27e9.';measurement='Will collapse to |0\u27e9 with certainty.';}
   else if(p1>0.999){basis='Excited state |1\u27e9 \u2014 south pole (\u03b8=180\u00b0).';physics='['+gates+'] flipped to excited state.';measurement='Will collapse to |1\u27e9 with certainty.';}
   else if(Math.abs(p0-0.5)<0.01){basis='Equal superposition on equator.';physics='['+gates+'] created max superposition. \u03b8='+tD+'\u00b0, \u03c6='+pD+'\u00b0. Entropy=1 bit.';measurement='50/50 random collapse. Max quantum randomness.';}
@@ -1641,7 +1658,7 @@ window.explainState=function(){
 const TUTORIAL_STEPS=[
   {title:'WELCOME TO QUANTUMSCOPE',text:'QuantumScope is a virtual experimental instrument for understanding qubit evolution, gate physics, and quantum measurement in real time. You will manipulate a single qubit using quantum gates, observe its evolution on the Bloch sphere, and explore fundamental quantum mechanics concepts.'},
   {title:'THE QUBIT STATE',text:'A qubit is described by |\u03c8\u27e9 = \u03b1|0\u27e9 + \u03b2|1\u27e9 where \u03b1 and \u03b2 are complex numbers. The left panel shows these amplitudes, probabilities P(|0\u27e9) and P(|1\u27e9), and the Bloch sphere angles \u03b8 and \u03c6.'},
-  {title:'QUANTUM GATES',text:'Click gate buttons (H, X, Y, Z, S, T) or press keyboard shortcuts. Each gate performs a unitary transformation on the qubit state. The H gate creates superposition; X flips the qubit; Z adds a phase.'},
+  {title:'QUANTUM GATES',text:'Click gate buttons (H, X, Y, Z, S, T) or press keyboard shortcuts. Each gate performs a unitary transformation on the qubit state. The H gate creates superposition; X flips the qubit; Z adds a phase. Note: gate names X, Y, Z refer to Pauli rotation axes, not Bloch-sphere direction labels. Pauli-X sends |0\u27e9 to the south pole |1\u27e9, not toward the +X equator marker.'},
   {title:'THE BLOCH SPHERE',text:'The 3D Bloch sphere in the center visualizes the qubit state geometrically. |0\u27e9 is at the north pole, |1\u27e9 at the south. Drag to rotate the view. The arrow shows the current state vector, and the trail shows its path.'},
   {title:'MEASUREMENT & COLLAPSE',text:'Click MEASURE or press <kbd>M</kbd> to collapse the wavefunction. The outcome is probabilistic \u2014 governed by |\u03b1|\u00b2 and |\u03b2|\u00b2. After measurement, the qubit is in a definite state. Use MULTI(100) for statistical sampling.'},
   {title:'ADVANCED FEATURES',text:'Explore Bell states for entanglement, the Decoherence Simulator for noise effects, the Phase Wheel for relative phase visualization, the Density Matrix for the full quantum state picture, and the Challenge Mode to test your knowledge!'}
@@ -1668,7 +1685,7 @@ function renderTutorial(){
 const CHALLENGES=[
   {q:'After H on |0\u27e9, P(|0\u27e9)?',opts:['25%','50%','75%','100%'],answer:1},
   {q:'X on |0\u27e9 produces?',opts:['|0\u27e9','|1\u27e9','|+\u27e9','|-\u27e9'],answer:1},
-  {q:'Z on |+\u27e9. P(|0\u27e9)?',opts:['100%','0%','50%','75%'],answer:2},
+  {q:'Z gate affects which quantity?',opts:['P(|0\u27e9)','P(|1\u27e9)','Relative phase \u03c6','Both probs'],answer:2},
   {q:'H\u2192H on |0\u27e9. Final?',opts:['|+\u27e9','|-\u27e9','|0\u27e9','|1\u27e9'],answer:2},
   {q:'S changes which Bloch angle?',opts:['\u03b8','\u03c6','Both','Neither'],answer:1},
   {q:'Entropy of |0\u27e9?',opts:['0 bits','0.5','1 bit','undef'],answer:0},
